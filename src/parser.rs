@@ -1,8 +1,9 @@
-use std::any::TypeId;
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
 
+use crate::error::Error;
 use crate::wasm::*;
 
 /// Returns (value, length read)
@@ -19,16 +20,39 @@ fn parse_leb128(bytes: &[u8]) -> (u64, usize) {
     (value, offset)
 }
 
-pub enum Error {
-    InvalidInput,
-    BadVersion,
-    UnknownSection,
-    UnknownOpcode,
-}
-
 struct ByteReader {
     content: Vec<u8>,
     offset: usize,
+}
+
+trait CheckedFromU64 {
+    fn from(u: u64) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+
+impl CheckedFromU64 for u64 {
+    fn from(u: u64) -> Result<Self, Error> {
+        Ok(u)
+    }
+}
+
+impl CheckedFromU64 for i32 {
+    fn from(u: u64) -> Result<Self, Error> {
+        match Self::try_from(u) {
+            Ok(n) => Ok(n),
+            Err(_) => Err(Error::IntSizeViolation),
+        }
+    }
+}
+
+impl CheckedFromU64 for usize {
+    fn from(u: u64) -> Result<Self, Error> {
+        match Self::try_from(u) {
+            Ok(n) => Ok(n),
+            Err(_) => Err(Error::IntSizeViolation),
+        }
+    }
 }
 
 impl ByteReader {
@@ -39,29 +63,80 @@ impl ByteReader {
         }
     }
 
-    fn read_byte(&mut self) -> u8 {
-        todo!()
+    fn read_byte(&mut self) -> Result<u8, Error> {
+        let byte = match self.content.get(self.offset) {
+            Some(n) => n,
+            None => {
+                return Err(Error::EndOfData);
+            }
+        };
+        self.offset += 1;
+        Ok(*byte)
     }
 
-    fn read_int(&mut self) -> u64 {
+    fn read_bytes(&mut self, count: usize) -> Result<Vec<u8>, Error> {
+        let mut bytes = Vec::new();
+        for _ in 0..count {
+            bytes.push(self.read_byte()?);
+        }
+        Ok(bytes)
+    }
+
+    fn read_int<I: CheckedFromU64>(&mut self) -> Result<I, Error> {
         let (value, read_bytes) = parse_leb128(&self.content[self.offset..]);
         self.offset += read_bytes;
-        value
+        Ok(I::from(value)?)
     }
 
     fn read_inst(&mut self) -> Result<Option<Box<dyn Instruction>>, Error> {
-        let opcode = self.read_int();
+        let opcode = self.read_int::<u64>()?;
         match opcode {
             0x0B => Ok(None),
-            0x41 => Ok(Some(Box::new(I32Const::new(self.read_int() as i32)))),
+            0x41 => Ok(Some(Box::new(I32Const::new(self.read_int::<i32>()?)))),
             _ => {
                 return Err(Error::UnknownOpcode);
             }
         }
     }
 
-    fn read_utf8(&mut self) -> String {
-        todo!()
+    fn read_primitive_type(&mut self) -> Result<PrimitiveType, Error> {
+        match self.read_byte()? {
+            0x7F => Ok(PrimitiveType::I32),
+            0x7E => Ok(PrimitiveType::I64),
+            0x7D => Ok(PrimitiveType::F32),
+            0x7C => Ok(PrimitiveType::F64),
+            _ => Err(Error::UnexpectedData("Expected a number type")),
+        }
+    }
+
+    fn read_function_type(&mut self) -> Result<FunctionType, Error> {
+        if self.read_byte()? != 0x60 {
+            return Err(Error::UnexpectedData("Expected function type"));
+        }
+
+        let mut param_types = Vec::new();
+        let mut result_types = Vec::new();
+
+        let param_len = self.read_int()?;
+        for _i in 0..param_len {
+            param_types.push(self.read_primitive_type()?);
+        }
+
+        let result_len = self.read_int()?;
+        for _i in 0..result_len {
+            result_types.push(self.read_primitive_type()?);
+        }
+
+        Ok(FunctionType::new(param_types, result_types))
+    }
+
+    fn read_name(&mut self) -> Result<String, Error> {
+        let name_len = self.read_int()?;
+        let name = match String::from_utf8(self.read_bytes(name_len)?) {
+            Ok(s) => s,
+            Err(_) => return Err(Error::UnexpectedData("Expected a valid UTF-8 string")),
+        };
+        Ok(name)
     }
 }
 
@@ -73,10 +148,13 @@ struct ModuleSection {
 impl ModuleSection {
     fn new(section_type: u8, content: &[u8]) -> Self {
         /// TODO: make a macro for this
-        for i in 0..content.len() {
-            print!("{:02X} ", content[i]);
+        #[cfg(debug)]
+        {
+            // for i in 0..content.len() {
+            //     print!("{:02X} ", content[i]);
+            // }
+            // println!();
         }
-        println!();
         ModuleSection {
             section_type,
             content: ByteReader::new(content),
@@ -85,17 +163,56 @@ impl ModuleSection {
 
     fn update_module(&mut self, module: &mut Module) -> Result<(), Error> {
         match self.section_type {
-            0x0A => {
-                // Handle code section
-                let functions_vec_len = self.content.read_int();
-                for i in 0..functions_vec_len {
-                    let function_len_bytes = self.content.read_int();
-                    let locals_vec_len = self.content.read_int();
-                    for local_index in 0..locals_vec_len {
+            1 => {
+                // Type section
+                let type_vec_len = self.content.read_int()?;
+                for _i in 0..type_vec_len {
+                    module.add_function_type(self.content.read_function_type()?);
+                }
+            }
+            3 => {
+                // Function section
+                let type_index_vec_len = self.content.read_int()?;
+                for _ in 0..type_index_vec_len {
+                    let type_index = self.content.read_int()?;
+                    let function_type = module.get_function_type(type_index);
+                    module.add_function(Function::new(function_type))
+                }
+            }
+            7 => {
+                // Export section
+                let export_vec_len = self.content.read_int()?;
+                for _ in 0..export_vec_len {
+                    let name = self.content.read_name()?;
+                    match self.content.read_byte()? {
+                        0x00 => {
+                            module.add_export(name, Export::Function(self.content.read_int()?))?
+                        }
+                        0x01 => module.add_export(name, Export::Table(self.content.read_int()?))?,
+                        0x02 => {
+                            module.add_export(name, Export::Memory(self.content.read_int()?))?
+                        }
+                        0x03 => {
+                            module.add_export(name, Export::Global(self.content.read_int()?))?
+                        }
+                        _ => {
+                            return Err(Error::UnexpectedData(
+                                "Expected a valid export descriptor type",
+                            ))
+                        }
+                    }
+                }
+            }
+            10 => {
+                // Code section
+                let functions_vec_len = self.content.read_int()?;
+                for function_index in 0..functions_vec_len {
+                    let _function_len_bytes = self.content.read_int::<usize>()?; /* Needs to be read, but we don't use it */
+                    let locals_vec_len = self.content.read_int()?;
+                    for _ in 0..locals_vec_len {
                         todo!();
                     }
-
-                    let mut function = Function::new();
+                    let function = module.get_mut_function(function_index);
 
                     loop {
                         match self.content.read_inst() {
@@ -108,7 +225,8 @@ impl ModuleSection {
                     }
                 }
             }
-            _ => {
+            x => {
+                println!("Unimplemented section: {:X}", x)
                 // return Err(Error::UnknownSection);
             }
         }
