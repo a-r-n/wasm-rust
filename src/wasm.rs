@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use crate::error::Error;
 
 /// The allowable types for any real value in wasm (u8 and others are packed)
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum PrimitiveType {
     I32,
     I64,

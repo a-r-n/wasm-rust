@@ -88,6 +88,63 @@ impl Instruction for F64Const {
     }
 }
 
+pub enum Signedness {
+    Signed,
+    Unsigned,
+}
+
+pub enum IBinOpType {
+    Add,
+    Sub,
+    Mul,
+    Div(Signedness),
+    Rem(Signedness),
+    And,
+    Or,
+    Xor,
+    Shl,
+    Shr(Signedness),
+    Rotl,
+    Rotr,
+}
+
+pub struct IBinOp {
+    result_type: PrimitiveType,
+    op_type: IBinOpType,
+}
+
+impl IBinOp {
+    pub fn new(result_type: PrimitiveType, op_type: IBinOpType) -> Self {
+        Self {
+            result_type,
+            op_type,
+        }
+    }
+}
+
+impl Instruction for IBinOp {
+    fn execute(&self, stack: &mut Stack, memory: &mut Memory) -> Result<ControlInfo, Error> {
+        let op_1 = stack.pop_value()?;
+        let op_0 = stack.pop_value()?;
+        if op_0.t != op_1.t {
+            return Err(Error::Misc("Operant type mismatch"));
+        }
+
+        let val_0 = unsafe { op_0.v.i64 } as u64;
+        let val_1 = unsafe { op_1.v.i64 } as u64;
+
+        let result = match self.op_type {
+            IBinOpType::Add => Value::from_explicit_type(self.result_type, val_0 + val_1),
+            IBinOpType::Sub => Value::from_explicit_type(self.result_type, val_0 - val_1),
+            _ => todo!(),
+        };
+
+        stack.push_value(result);
+
+        Ok(ControlInfo::None)
+    }
+}
+
 pub struct Load {
     result_type: PrimitiveType,
     load_bitwidth: u8,
