@@ -102,27 +102,7 @@ pub trait Instruction {
     fn execute(&self, stack: &mut Stack) -> ControlInfo;
 }
 
-pub struct I32Const {
-    value: Value,
-}
-
-impl I32Const {
-    pub fn new(v: i32) -> Self {
-        I32Const {
-            value: Value {
-                t: PrimitiveType::I32,
-                v: InternalValue { i32: v },
-            },
-        }
-    }
-}
-
-impl Instruction for I32Const {
-    fn execute(&self, stack: &mut Stack) -> ControlInfo {
-        stack.push_value(self.value);
-        ControlInfo::None
-    }
-}
+pub mod inst;
 
 #[derive(Default)]
 struct Table {
