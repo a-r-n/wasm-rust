@@ -38,10 +38,10 @@ impl std::fmt::Display for Value {
                     write!(f, "({}:{})", "i64", self.v.i64)
                 }
                 PrimitiveType::F32 => {
-                    write!(f, "({}:{})", "32", self.v.f32)
+                    write!(f, "({}:{})", "f32", self.v.f32)
                 }
                 PrimitiveType::F64 => {
-                    write!(f, "({}:{})", "F64", self.v.f64)
+                    write!(f, "({}:{})", "f64", self.v.f64)
                 }
             }
         }
