@@ -190,7 +190,12 @@ impl Stack {
 
 pub trait Instruction {
     /// A wasm instruction may modify any state of the program
-    fn execute(&self, stack: &mut Stack, memory: &mut Memory) -> Result<ControlInfo, Error>;
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        memory: &mut Memory,
+        locals: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error>;
 }
 
 pub mod inst;
@@ -223,10 +228,10 @@ impl Function {
         self.locals.push(v);
     }
 
-    pub fn call(&self, memory: &mut Memory) -> Result<Value, Error> {
+    pub fn call(&mut self, memory: &mut Memory) -> Result<Value, Error> {
         let mut stack = Stack::new();
         for instruction in &self.instructions {
-            instruction.execute(&mut stack, memory)?;
+            instruction.execute(&mut stack, memory, &mut self.locals)?;
         }
         let ret = stack.pop_value();
         stack.assert_empty()?;
@@ -328,7 +333,7 @@ impl Module {
             Some(Export::Function(n)) => *n,
             _ => return Err(Error::Misc("On module call, given name is not a function")),
         };
-        let function = match self.functions.get(function_index) {
+        let function = match self.functions.get_mut(function_index) {
             Some(n) => n,
             None => {
                 return Err(Error::Misc(
