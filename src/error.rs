@@ -2,7 +2,7 @@ pub enum Error {
     InvalidInput,
     BadVersion,
     UnknownSection,
-    UnknownOpcode,
+    UnknownOpcode(u64),
     EndOfData,
     IntSizeViolation,
     StackViolation,

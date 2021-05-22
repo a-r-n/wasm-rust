@@ -5,6 +5,7 @@ use std::io::Read;
 
 use crate::error::Error;
 use crate::wasm::*;
+use crate::wasm::inst::*;
 
 /// Returns (value, length read)
 fn parse_leb128(bytes: &[u8]) -> (u64, usize) {
@@ -93,8 +94,8 @@ impl ByteReader {
         match opcode {
             0x0B => Ok(None),
             0x41 => Ok(Some(Box::new(I32Const::new(self.read_int::<i32>()?)))),
-            _ => {
-                return Err(Error::UnknownOpcode);
+            x => {
+                return Err(Error::UnknownOpcode(x));
             }
         }
     }
@@ -208,11 +209,15 @@ impl ModuleSection {
                 let functions_vec_len = self.content.read_int()?;
                 for function_index in 0..functions_vec_len {
                     let _function_len_bytes = self.content.read_int::<usize>()?; /* Needs to be read, but we don't use it */
+                    let function = module.get_mut_function(function_index);
+
                     let locals_vec_len = self.content.read_int()?;
                     for _ in 0..locals_vec_len {
-                        todo!();
+                        let _t_vec: usize = self.content.read_int()?; // For vector types (I think) which we don't currently support -ARN
+                        let t = self.content.read_primitive_type()?;
+                        let value = Value::from(t);
+                        function.new_local(value);
                     }
-                    let function = module.get_mut_function(function_index);
 
                     loop {
                         match self.content.read_inst() {

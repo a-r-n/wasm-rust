@@ -12,8 +12,8 @@ fn handle_error<T>(x: Result<T, Error>) -> T {
         Err(Error::InvalidInput) => {
             println!("invalid input")
         }
-        Err(Error::UnknownOpcode) => {
-            println!("unknown opcode")
+        Err(Error::UnknownOpcode(x)) => {
+            println!("unknown opcode: 0x{:X}", x)
         }
         Err(Error::EndOfData) => {
             println!("end of data")
@@ -30,7 +30,7 @@ fn handle_error<T>(x: Result<T, Error>) -> T {
 
 fn main() {
     println!("enter main");
-    let mut module = handle_error(parse_wasm("test_inputs/program.wasm"));
+    let mut module = handle_error(parse_wasm("test_inputs/addition.wasm"));
     let ret_val = handle_error(module.call("main"));
     println!("Final value: {}", ret_val);
     // return module.call_external("main");

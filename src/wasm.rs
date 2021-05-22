@@ -11,13 +11,61 @@ pub enum PrimitiveType {
     F64,
 }
 
+impl From<i32> for PrimitiveType {
+    fn from(_: i32) -> PrimitiveType {
+        PrimitiveType::I32
+    }
+}
+
+impl From<i64> for PrimitiveType {
+    fn from(_: i64) -> PrimitiveType {
+        PrimitiveType::I64
+    }
+}
+
+impl From<f32> for PrimitiveType {
+    fn from(_: f32) -> PrimitiveType {
+        PrimitiveType::F32
+    }
+}
+
+impl From<f64> for PrimitiveType {
+    fn from(_: f64) -> PrimitiveType {
+        PrimitiveType::F64
+    }
+}
+
 /// Storage type for all wasm values
 #[derive(Copy, Clone)]
-union InternalValue {
+pub union InternalValue {
     i32: i32,
     i64: i64,
     f32: f32,
     f64: f64,
+}
+
+impl From<i32> for InternalValue {
+    fn from(x: i32) -> InternalValue {
+        InternalValue { i32: x }
+    }
+}
+
+impl From<i64> for InternalValue {
+    fn from(x: i64) -> InternalValue {
+        InternalValue { i64: x }
+    }
+}
+
+impl From<f32> for InternalValue {
+    fn from(x: f32) -> InternalValue {
+        InternalValue { f32: x }
+    }
+}
+
+impl From<f64> for InternalValue {
+    fn from(x: f64) -> InternalValue {
+        InternalValue { f64: x }
+    }
 }
 
 /// Representation of all wasm values
@@ -25,6 +73,26 @@ union InternalValue {
 pub struct Value {
     t: PrimitiveType,
     v: InternalValue,
+}
+
+impl Value {
+    pub fn new<T: Into<InternalValue> + Into<PrimitiveType> + Copy>(x: T) -> Self {
+        Self {
+            t: x.into(),
+            v: x.into(),
+        }
+    }
+}
+
+impl From<PrimitiveType> for Value {
+    fn from(x: PrimitiveType) -> Value {
+        match x {
+            PrimitiveType::I32 => Value::new(0_i32),
+            PrimitiveType::I64 => Value::new(0_i64),
+            PrimitiveType::F32 => Value::new(0_f32),
+            PrimitiveType::F64 => Value::new(0_f64),
+        }
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -55,8 +123,7 @@ pub enum ControlInfo {
 }
 
 /// Representation of a wasm stack.
-/// Formally, all functions get their own stack.
-/// In properly formed wasm code, this is not required from an implementation perspective.\
+/// All functions use a new stack when called.
 #[derive(Default)]
 pub struct Stack {
     values: Vec<Value>,
@@ -126,6 +193,10 @@ impl Function {
 
     pub fn push_inst(&mut self, i: Box<dyn Instruction>) {
         self.instructions.push(i);
+    }
+
+    pub fn new_local(&mut self, v: Value) {
+        self.locals.push(v);
     }
 
     pub fn call(&self) -> Result<Value, Error> {
