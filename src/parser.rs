@@ -4,8 +4,8 @@ use std::io::BufReader;
 use std::io::Read;
 
 use crate::error::Error;
-use crate::wasm::*;
 use crate::wasm::inst::*;
+use crate::wasm::*;
 
 /// Returns (value, length read)
 fn parse_leb128(bytes: &[u8]) -> (u64, usize) {
@@ -47,6 +47,15 @@ impl CheckedFromU64 for i32 {
     }
 }
 
+impl CheckedFromU64 for u32 {
+    fn from(u: u64) -> Result<Self, Error> {
+        match Self::try_from(u) {
+            Ok(n) => Ok(n),
+            Err(_) => Err(Error::IntSizeViolation),
+        }
+    }
+}
+
 impl CheckedFromU64 for usize {
     fn from(u: u64) -> Result<Self, Error> {
         match Self::try_from(u) {
@@ -54,6 +63,12 @@ impl CheckedFromU64 for usize {
             Err(_) => Err(Error::IntSizeViolation),
         }
     }
+}
+
+macro_rules! inst {
+    ($x:expr) => {
+        Ok(Some(Box::new($x)))
+    };
 }
 
 impl ByteReader {
@@ -93,7 +108,31 @@ impl ByteReader {
         let opcode = self.read_int::<u64>()?;
         match opcode {
             0x0B => Ok(None),
-            0x41 => Ok(Some(Box::new(I32Const::new(self.read_int::<i32>()?)))),
+            0x28 => inst!(Load::new(
+                PrimitiveType::I32,
+                32,
+                self.read_int()?,
+                self.read_int()?
+            )),
+            0x29 => inst!(Load::new(
+                PrimitiveType::I64,
+                64,
+                self.read_int()?,
+                self.read_int()?
+            )),
+            0x2A => inst!(Load::new(
+                PrimitiveType::F32,
+                32,
+                self.read_int()?,
+                self.read_int()?
+            )),
+            0x2B => inst!(Load::new(
+                PrimitiveType::F64,
+                64,
+                self.read_int()?,
+                self.read_int()?
+            )),
+            0x41 => inst!(I32Const::new(self.read_int::<i32>()?)),
             x => {
                 return Err(Error::UnknownOpcode(x));
             }
@@ -119,12 +158,12 @@ impl ByteReader {
         let mut result_types = Vec::new();
 
         let param_len = self.read_int()?;
-        for _i in 0..param_len {
+        for _ in 0..param_len {
             param_types.push(self.read_primitive_type()?);
         }
 
         let result_len = self.read_int()?;
-        for _i in 0..result_len {
+        for _ in 0..result_len {
             result_types.push(self.read_primitive_type()?);
         }
 
@@ -178,6 +217,28 @@ impl ModuleSection {
                     let type_index = self.content.read_int()?;
                     let function_type = module.get_function_type(type_index);
                     module.add_function(Function::new(function_type))
+                }
+            }
+            5 => {
+                // Memory section
+                let memory_vec_len = self.content.read_int()?;
+                if memory_vec_len > 1 {
+                    return Err(Error::Misc(
+                        "Multiple memories are unimplemented per WASM spec restrictions.",
+                    ));
+                }
+                for _ in 0..memory_vec_len {
+                    // These are called limits in the spec, could abstract if it's ever used somewhere else
+                    let (mem_min, mem_max) = match self.content.read_byte()? {
+                        0x00 => (self.content.read_int::<u32>()?, u32::MAX),
+                        0x01 => (
+                            self.content.read_int::<u32>()?,
+                            self.content.read_int::<u32>()?,
+                        ),
+                        _ => return Err(Error::UnexpectedData("Expected a valid limit type")),
+                    };
+                    let memory = Memory::new(mem_min, mem_max);
+                    module.add_memory(memory);
                 }
             }
             7 => {

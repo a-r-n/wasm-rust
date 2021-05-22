@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 use crate::error::Error;
 
@@ -82,6 +83,23 @@ impl Value {
             v: x.into(),
         }
     }
+
+    pub fn from_explicit_type(t: PrimitiveType, v: u64) -> Value {
+        Self {
+            t,
+            v: InternalValue { i64: v as i64 },
+        }
+    }
+}
+
+impl TryFrom<Value> for u32 {
+    type Error = Error;
+    fn try_from(x: Value) -> Result<u32, Error> {
+        match x.t {
+            PrimitiveType::I32 => Ok(unsafe { x.v.i32 as u32 }),
+            _ => Err(Error::Misc("Cannot extract as u32 from incorrect type")),
+        }
+    }
 }
 
 impl From<PrimitiveType> for Value {
@@ -116,9 +134,15 @@ impl std::fmt::Display for Value {
     }
 }
 
+/// Represents expected runtime errors, i.e. problems with the program, not the interpreter
+pub enum Trap {
+    MemoryOutOfBounds,
+}
+
 pub enum ControlInfo {
     Branch(usize),
     Return,
+    Trap(Trap),
     None,
 }
 
@@ -166,7 +190,7 @@ impl Stack {
 
 pub trait Instruction {
     /// A wasm instruction may modify any state of the program
-    fn execute(&self, stack: &mut Stack) -> ControlInfo;
+    fn execute(&self, stack: &mut Stack, memory: &mut Memory) -> Result<ControlInfo, Error>;
 }
 
 pub mod inst;
@@ -199,10 +223,10 @@ impl Function {
         self.locals.push(v);
     }
 
-    pub fn call(&self) -> Result<Value, Error> {
+    pub fn call(&self, memory: &mut Memory) -> Result<Value, Error> {
         let mut stack = Stack::new();
         for instruction in &self.instructions {
-            instruction.execute(&mut stack);
+            instruction.execute(&mut stack, memory)?;
         }
         let ret = stack.pop_value();
         stack.assert_empty()?;
@@ -211,8 +235,58 @@ impl Function {
 }
 
 #[derive(Default)]
-struct Memory {
+pub struct Memory {
     bytes: Vec<u8>,
+    virtual_size_pages: u32,
+    upper_limit_pages: u32,
+}
+
+const PAGE_SIZE: u64 = 0x10000;
+impl Memory {
+    pub fn new(min: u32, max: u32) -> Self {
+        Self {
+            bytes: Vec::new(),
+            virtual_size_pages: min,
+            upper_limit_pages: max,
+        }
+    }
+
+    pub fn read(
+        &mut self,
+        result_type: PrimitiveType,
+        bitwidth: u8,
+        address: u64,
+    ) -> Option<Value> {
+        let final_byte_bits = bitwidth % 8;
+        let bytes_to_read = (bitwidth / 8) + if final_byte_bits == 0 { 0 } else { 1 };
+        let last_read_address = address + bytes_to_read as u64;
+        // Check for out of bounds access
+        if last_read_address > PAGE_SIZE * self.virtual_size_pages as u64 {
+            return None;
+        }
+        // Resize internal vector if needed
+        if last_read_address > (self.bytes.len() - 1) as u64 {
+            self.bytes.resize(last_read_address as usize, 0); // resize may not be correct -ARN
+        }
+        let mut result = 0_u64;
+        for i in address..(last_read_address - 1) {
+            // Read entire bytes
+            result += self.bytes[i as usize] as u64;
+            result <<= 8;
+        }
+        // Final byte
+        if final_byte_bits == 0 {
+            // Actually read all 8 bytes
+            result += self.bytes[last_read_address as usize] as u64;
+        } else {
+            let final_byte = self.bytes[last_read_address as usize];
+            for i in 0..final_byte_bits {
+                result |= final_byte as u64 & 1 << i;
+            }
+        }
+
+        Some(Value::from_explicit_type(result_type, result))
+    }
 }
 
 #[derive(Default, Clone)]
@@ -262,7 +336,7 @@ impl Module {
                 ))
             }
         };
-        function.call()
+        function.call(&mut self.memory)
     }
 
     pub fn add_function_type(&mut self, ft: FunctionType) {
@@ -275,6 +349,10 @@ impl Module {
 
     pub fn add_function(&mut self, f: Function) {
         self.functions.push(f);
+    }
+
+    pub fn add_memory(&mut self, m: Memory) {
+        self.memory = m;
     }
 
     pub fn add_export(&mut self, name: String, export: Export) -> Result<(), Error> {
