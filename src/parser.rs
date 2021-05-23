@@ -135,6 +135,7 @@ impl ByteReader {
                 self.read_int()?,
                 self.read_int()?
             )),
+            0x36 => inst!(Store::new(32, self.read_int()?)),
             0x6A => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Add)),
             0x6B => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Sub)),
             0x41 => inst!(I32Const::new(self.read_int::<i32>()?)),

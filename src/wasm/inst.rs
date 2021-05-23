@@ -284,3 +284,30 @@ impl Instruction for Load {
         }
     }
 }
+
+pub struct Store {
+    bitwidth: u8,
+    offset: u32,
+}
+
+impl Store {
+    pub fn new(bitwidth: u8, offset: u32) -> Self {
+        Self { bitwidth, offset }
+    }
+}
+
+impl Instruction for Store {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        memory: &mut Memory,
+        locals: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
+        let value = unsafe { stack.pop_value()?.v.i64 } as u64;
+        match memory.write(value, self.bitwidth, address) {
+            Some(_) => Ok(ControlInfo::None),
+            None => Ok(ControlInfo::Trap(Trap::MemoryOutOfBounds)),
+        }
+    }
+}

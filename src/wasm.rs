@@ -256,6 +256,33 @@ impl Memory {
         }
     }
 
+    pub fn write(&mut self, mut value: u64, bitwidth: u8, address: u64) -> Option<()> {
+        if bitwidth % 8 != 0 {
+            // Probably don't even need to implement this
+            panic!();
+        }
+
+        let bytes_to_write = bitwidth / 8;
+        let last_write_address = address + bytes_to_write as u64;
+
+        // Check for out of bounds access
+        if last_write_address > PAGE_SIZE * self.virtual_size_pages as u64 {
+            return None;
+        }
+
+        // Resize internal vector if needed
+        if last_write_address > (self.bytes.len() - 1) as u64 {
+            self.bytes.resize(last_write_address as usize, 0); // resize may not be correct -ARN
+        }
+
+        for i in (address + bytes_to_write as u64)..address {
+            self.bytes[(address + i) as usize] = (value & 0xFF) as u8;
+            value >>= 8;
+        }
+
+        Some(())
+    }
+
     pub fn read(
         &mut self,
         result_type: PrimitiveType,
