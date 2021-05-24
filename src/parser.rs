@@ -12,10 +12,10 @@ fn parse_leb128(bytes: &[u8]) -> (u64, usize) {
     let mut value = 0_u64;
     let mut offset = 0_usize;
     while bytes[offset] & (1_u8 << 7) != 0 {
-        value += ((bytes[offset] & 0b01111111) as u64) << 7 * offset;
+        value += ((bytes[offset] & 0b01111111) as u64) << (7 * offset);
         offset += 1;
     }
-    value += ((bytes[offset] & 0b01111111) as u64) << 7 * offset;
+    value += ((bytes[offset] & 0b01111111) as u64) << (7 * offset);
     offset += 1;
 
     (value, offset)

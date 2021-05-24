@@ -118,16 +118,16 @@ impl std::fmt::Display for Value {
         unsafe {
             match self.t {
                 PrimitiveType::I32 => {
-                    write!(f, "({}:{})", "i32", self.v.i32)
+                    write!(f, "(i32:{})", self.v.i32)
                 }
                 PrimitiveType::I64 => {
-                    write!(f, "({}:{})", "i64", self.v.i64)
+                    write!(f, "(i64:{})", self.v.i64)
                 }
                 PrimitiveType::F32 => {
-                    write!(f, "({}:{})", "f32", self.v.f32)
+                    write!(f, "(f32:{})", self.v.f32)
                 }
                 PrimitiveType::F64 => {
-                    write!(f, "({}:{})", "f64", self.v.f64)
+                    write!(f, "(f64:{})", self.v.f64)
                 }
             }
         }

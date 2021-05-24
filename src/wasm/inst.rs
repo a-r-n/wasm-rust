@@ -19,8 +19,8 @@ impl Instruction for I32Const {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
-        locals: &mut Vec<Value>,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         stack.push_value(self.value);
         Ok(ControlInfo::None)
@@ -46,8 +46,8 @@ impl Instruction for I64Const {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
-        locals: &mut Vec<Value>,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         stack.push_value(self.value);
         Ok(ControlInfo::None)
@@ -73,8 +73,8 @@ impl Instruction for F32Const {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
-        locals: &mut Vec<Value>,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         stack.push_value(self.value);
         Ok(ControlInfo::None)
@@ -100,8 +100,8 @@ impl Instruction for F64Const {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
-        locals: &mut Vec<Value>,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         stack.push_value(self.value);
         Ok(ControlInfo::None)
@@ -146,8 +146,8 @@ impl Instruction for IBinOp {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
-        locals: &mut Vec<Value>,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         let op_1 = stack.pop_value()?;
         let op_0 = stack.pop_value()?;
@@ -184,7 +184,7 @@ impl Instruction for LocalGet {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
+        _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         stack.push_value(locals[self.index].clone());
@@ -206,7 +206,7 @@ impl Instruction for LocalSet {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
+        _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         locals[self.index] = stack.pop_value()?;
@@ -228,7 +228,7 @@ impl Instruction for LocalTee {
     fn execute(
         &self,
         stack: &mut Stack,
-        memory: &mut Memory,
+        _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         locals[self.index] = stack.fetch_value(0)?.clone();
@@ -272,7 +272,7 @@ impl Instruction for Load {
         &self,
         stack: &mut Stack,
         memory: &mut Memory,
-        locals: &mut Vec<Value>,
+        _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
         match memory.read(self.result_type, self.load_bitwidth, address) {
@@ -301,7 +301,7 @@ impl Instruction for Store {
         &self,
         stack: &mut Stack,
         memory: &mut Memory,
-        locals: &mut Vec<Value>,
+        _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
         let value = unsafe { stack.pop_value()?.v.i64 } as u64;
