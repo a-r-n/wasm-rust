@@ -108,6 +108,7 @@ impl ByteReader {
         let opcode = self.read_int::<u64>()?;
         match opcode {
             0x0B => Ok(None),
+            // 0x0C => inst!()
             0x20 => inst!(LocalGet::new(self.read_int()?)),
             0x21 => inst!(LocalSet::new(self.read_int()?)),
             0x22 => inst!(LocalTee::new(self.read_int()?)),
@@ -135,7 +136,7 @@ impl ByteReader {
                 self.read_int()?,
                 self.read_int()?
             )),
-            0x36 => inst!(Store::new(32, self.read_int()?)),
+            0x36 => inst!(Store::new(32, self.read_int()?, self.read_int()?)),
             0x6A => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Add)),
             0x6B => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Sub)),
             0x41 => inst!(I32Const::new(self.read_int::<i32>()?)),

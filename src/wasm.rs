@@ -140,7 +140,7 @@ pub enum Trap {
 }
 
 pub enum ControlInfo {
-    Branch(usize),
+    Branch(u32),
     Return,
     Trap(Trap),
     None,
@@ -159,13 +159,21 @@ impl Stack {
     }
 
     fn push_value(&mut self, v: Value) {
+        log::debug!("Pushing {}", v);
         self.values.push(v);
     }
 
     pub fn pop_value(&mut self) -> Result<Value, Error> {
+        log::debug!("Current stack len {}", self.values.len());
         match self.values.pop() {
-            Some(n) => Ok(n),
-            None => Err(Error::StackViolation),
+            Some(n) => {
+                log::debug!("Popped {}", n);
+                Ok(n)
+            }
+            None => {
+                log::debug!("Pop empty");
+                panic!() // Err(Error::StackViolation)
+            }
         }
     }
 
@@ -175,7 +183,10 @@ impl Stack {
         let offset_to_fetch = stack_size - 1 - offset;
         match self.values.get(offset_to_fetch) {
             Some(n) => Ok(n),
-            None => Err(Error::StackViolation),
+            None => {
+                log::debug!("Try to read {} stack size {}", offset_to_fetch, stack_size);
+                Err(Error::StackViolation)
+            }
         }
     }
 
@@ -231,7 +242,10 @@ impl Function {
     pub fn call(&mut self, memory: &mut Memory) -> Result<Value, Error> {
         let mut stack = Stack::new();
         for instruction in &self.instructions {
-            instruction.execute(&mut stack, memory, &mut self.locals)?;
+            match instruction.execute(&mut stack, memory, &mut self.locals)? {
+                ControlInfo::Trap(Trap::MemoryOutOfBounds) => panic!(),
+                _ => (),
+            };
         }
         let ret = stack.pop_value();
         stack.assert_empty()?;
@@ -249,14 +263,22 @@ pub struct Memory {
 const PAGE_SIZE: u64 = 0x10000;
 impl Memory {
     pub fn new(min: u32, max: u32) -> Self {
-        Self {
-            bytes: Vec::new(),
+        let mut s = Self {
+            bytes: Vec::with_capacity((PAGE_SIZE * min as u64) as usize),
             virtual_size_pages: min,
             upper_limit_pages: max,
-        }
+        };
+        s.write(PAGE_SIZE * min as u64, 32, 4); // It looks like
+        s
     }
 
     pub fn write(&mut self, mut value: u64, bitwidth: u8, address: u64) -> Option<()> {
+        log::debug!(
+            "Write to address 0x{:x} with bitwidth {} and value 0x{:x}",
+            address,
+            bitwidth,
+            value
+        );
         if bitwidth % 8 != 0 {
             // Probably don't even need to implement this
             panic!();
@@ -271,12 +293,12 @@ impl Memory {
         }
 
         // Resize internal vector if needed
-        if last_write_address > (self.bytes.len() - 1) as u64 {
-            self.bytes.resize(last_write_address as usize, 0); // resize may not be correct -ARN
+        if self.bytes.is_empty() || last_write_address > (self.bytes.len() - 1) as u64 {
+            self.bytes.resize((last_write_address + 1) as usize, 0);
         }
 
-        for i in (address + bytes_to_write as u64)..address {
-            self.bytes[(address + i) as usize] = (value & 0xFF) as u8;
+        for i in (address..(address + bytes_to_write as u64)).rev() {
+            self.bytes[i as usize] = (value & 0xFF) as u8;
             value >>= 8;
         }
 
@@ -289,34 +311,21 @@ impl Memory {
         bitwidth: u8,
         address: u64,
     ) -> Option<Value> {
-        let final_byte_bits = bitwidth % 8;
-        let bytes_to_read = (bitwidth / 8) + if final_byte_bits == 0 { 0 } else { 1 };
-        let last_read_address = address + bytes_to_read as u64;
-        // Check for out of bounds access
-        if last_read_address > PAGE_SIZE * self.virtual_size_pages as u64 {
-            return None;
-        }
-        // Resize internal vector if needed
-        if last_read_address > (self.bytes.len() - 1) as u64 {
-            self.bytes.resize(last_read_address as usize, 0); // resize may not be correct -ARN
-        }
+        let bytes_to_read = (bitwidth / 8) as u64;
+
         let mut result = 0_u64;
-        for i in address..(last_read_address - 1) {
-            // Read entire bytes
-            result += self.bytes[i as usize] as u64;
+
+        for i in address..(address + bytes_to_read) {
             result <<= 8;
-        }
-        // Final byte
-        if final_byte_bits == 0 {
-            // Actually read all 8 bytes
-            result += self.bytes[last_read_address as usize] as u64;
-        } else {
-            let final_byte = self.bytes[last_read_address as usize];
-            for i in 0..final_byte_bits {
-                result |= final_byte as u64 & 1 << i;
-            }
+            result += self.bytes[i as usize] as u64;
         }
 
+        log::debug!(
+            "Read from address 0x{:x} with bitwidth {} and value 0x{:x}",
+            address,
+            bitwidth,
+            result
+        );
         Some(Value::from_explicit_type(result_type, result))
     }
 }

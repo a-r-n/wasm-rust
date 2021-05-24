@@ -21,6 +21,12 @@ fn handle_error<T>(x: Result<T, Error>) -> T {
         Err(Error::UnexpectedData(s)) => {
             println!("{}", s);
         }
+        Err(Error::IntSizeViolation) => {
+            println!("int size violation")
+        }
+        Err(Error::StackViolation) => {
+            println!("stack violation")
+        }
         Err(_) => {
             println!("unknown error")
         }
@@ -29,6 +35,7 @@ fn handle_error<T>(x: Result<T, Error>) -> T {
 }
 
 fn main() {
+    env_logger::init();
     println!("enter main");
     let mut module = handle_error(parse_wasm("test_inputs/addition.wasm"));
     let ret_val = handle_error(module.call("main"));
