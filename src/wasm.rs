@@ -140,7 +140,7 @@ pub enum Trap {
 }
 
 pub enum ControlInfo {
-    Branch(usize),
+    Branch(u32),
     Return,
     Trap(Trap),
     None,
@@ -165,7 +165,10 @@ impl Stack {
     pub fn pop_value(&mut self) -> Result<Value, Error> {
         match self.values.pop() {
             Some(n) => Ok(n),
-            None => Err(Error::StackViolation),
+            None => {
+                println!("Pop empty");
+                panic!()// Err(Error::StackViolation)
+            }
         }
     }
 
@@ -175,7 +178,10 @@ impl Stack {
         let offset_to_fetch = stack_size - 1 - offset;
         match self.values.get(offset_to_fetch) {
             Some(n) => Ok(n),
-            None => Err(Error::StackViolation),
+            None => {
+                println!("Try to read {} stack size {}", offset_to_fetch, stack_size);
+                Err(Error::StackViolation)
+            }
         }
     }
 
@@ -272,7 +278,7 @@ impl Memory {
 
         // Resize internal vector if needed
         if last_write_address > (self.bytes.len() - 1) as u64 {
-            self.bytes.resize(last_write_address as usize, 0); // resize may not be correct -ARN
+            self.bytes.resize((last_write_address + 1) as usize, 0);
         }
 
         for i in (address + bytes_to_write as u64)..address {
@@ -297,8 +303,8 @@ impl Memory {
             return None;
         }
         // Resize internal vector if needed
-        if last_read_address > (self.bytes.len() - 1) as u64 {
-            self.bytes.resize(last_read_address as usize, 0); // resize may not be correct -ARN
+        if self.bytes.is_empty() || last_read_address > (self.bytes.len() - 1) as u64 {
+            self.bytes.resize((last_read_address + 1) as usize, 0);
         }
         let mut result = 0_u64;
         for i in address..(last_read_address - 1) {

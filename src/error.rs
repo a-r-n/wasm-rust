@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 pub enum Error {
     InvalidInput,
     BadVersion,
@@ -9,3 +11,7 @@ pub enum Error {
     UnexpectedData(&'static str),
     Misc(&'static str), /* Just to facilitate development for now, or for one-off errors */
 }
+
+// impl Display for Error {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+// }

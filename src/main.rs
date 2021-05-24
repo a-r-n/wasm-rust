@@ -21,6 +21,12 @@ fn handle_error<T>(x: Result<T, Error>) -> T {
         Err(Error::UnexpectedData(s)) => {
             println!("{}", s);
         }
+        Err(Error::IntSizeViolation) => {
+            println!("int size violation")
+        }
+        Err(Error::StackViolation) => {
+            println!("stack violation")
+        }
         Err(_) => {
             println!("unknown error")
         }

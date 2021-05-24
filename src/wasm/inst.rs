@@ -1,5 +1,7 @@
 use super::*;
 
+use std::num::Wrapping;
+
 pub struct I32Const {
     value: Value,
 }
@@ -155,12 +157,12 @@ impl Instruction for IBinOp {
             return Err(Error::Misc("Operant type mismatch"));
         }
 
-        let val_0 = unsafe { op_0.v.i64 } as u64;
-        let val_1 = unsafe { op_1.v.i64 } as u64;
+        let val_0 = Wrapping(unsafe { op_0.v.i64 } as u64);
+        let val_1 = Wrapping(unsafe { op_1.v.i64 } as u64);
 
         let result = match self.op_type {
-            IBinOpType::Add => Value::from_explicit_type(self.result_type, val_0 + val_1),
-            IBinOpType::Sub => Value::from_explicit_type(self.result_type, val_0 - val_1),
+            IBinOpType::Add => Value::from_explicit_type(self.result_type, (val_0 + val_1).0),
+            IBinOpType::Sub => Value::from_explicit_type(self.result_type, (val_0 - val_1).0),
             _ => todo!(),
         };
 
@@ -291,7 +293,7 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn new(bitwidth: u8, offset: u32) -> Self {
+    pub fn new(bitwidth: u8, _align: u32, offset: u32) -> Self {
         Self { bitwidth, offset }
     }
 }
@@ -303,11 +305,34 @@ impl Instruction for Store {
         memory: &mut Memory,
         _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
-        let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
         let value = unsafe { stack.pop_value()?.v.i64 } as u64;
+        let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
         match memory.write(value, self.bitwidth, address) {
             Some(_) => Ok(ControlInfo::None),
             None => Ok(ControlInfo::Trap(Trap::MemoryOutOfBounds)),
         }
+    }
+}
+
+struct Branch {
+    branch_index: u32,
+}
+
+impl Branch {
+    pub fn new(branch_index: u32) -> Self {
+        Self {
+            branch_index,
+        }
+    }
+}
+
+impl Instruction for Branch {
+    fn execute(
+        &self,
+        _: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        Ok(ControlInfo::Branch(self.branch_index))
     }
 }
