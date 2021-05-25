@@ -74,9 +74,28 @@ impl Instruction for IBinOp {
         let val_0 = Wrapping(unsafe { op_0.v.i64 } as u64);
         let val_1 = Wrapping(unsafe { op_1.v.i64 } as u64);
 
+        (val_0, val_1) = match self.result_type {
+            PrimitiveType::I32 => (val_0.0 as i32, val_1.0 as i32),
+            PrimitiveType::I64 => (),
+            PrimitiveType::F32 => (),
+            PrimitiveType::F64 => (),
+        };
+
         let result = match self.op_type {
             IBinOpType::Add => Value::from_explicit_type(self.result_type, (val_0 + val_1).0),
             IBinOpType::Sub => Value::from_explicit_type(self.result_type, (val_0 - val_1).0),
+            IBinOpType::Mul => Value::from_explicit_type(self.result_type, (val_0 * val_1).0),
+            IBinOpType::Div(_) => todo!(),
+            IBinOpType::Rem(_) => todo!(),
+            IBinOpType::And => Value::from_explicit_type(self.result_type, (val_0 & val_1).0),
+            IBinOpType::Or => Value::from_explicit_type(self.result_type, (val_0 | val_1).0),
+            IBinOpType::Xor => Value::from_explicit_type(self.result_type, (val_0 ^ val_1).0),
+            IBinOpType::Shl => Value::from_explicit_type(self.result_type, val_0.0 << val_1.0),
+            IBinOpType::Shr(_) => todo!(),
+            IBinOpType::Rotl => {
+                Value::from_explicit_type(self.result_type, val_0.0.rotate_left(val_1.0 as u32))
+            }
+
             _ => todo!(),
         };
 
@@ -84,6 +103,18 @@ impl Instruction for IBinOp {
         log::debug!("Pushed {}", result);
 
         Ok(ControlInfo::None)
+    }
+}
+
+use std::ops::*;
+impl IBinOp {
+    fn calculate<T>(&self, val_0: T, val_1: T) -> T
+    where
+        T: Add<T> + Sub + Mul + Div + Rem + BitAnd + BitOr + BitXor + Shl + Shr,
+    {
+        match self.op_type {
+            IBinOpType::Add => val_0 + val_1,
+        }
     }
 }
 
