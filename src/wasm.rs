@@ -163,11 +163,10 @@ impl Stack {
     }
 
     pub fn pop_value(&mut self) -> Result<Value, Error> {
-        println!("{}", self.values.len());
         match self.values.pop() {
             Some(n) => Ok(n),
             None => {
-                println!("Pop empty");
+                println!("pop empty");
                 panic!() // Err(Error::StackViolation)
             }
         }
@@ -232,6 +231,7 @@ impl Function {
     }
 
     pub fn new_local(&mut self, v: Value) {
+        println!("new local: {}", v);
         self.locals.push(v);
     }
 
@@ -267,7 +267,6 @@ impl Memory {
     }
 
     pub fn write(&mut self, mut value: u64, bitwidth: u8, address: u64) -> Option<()> {
-        println!("write to address {}", address);
         if bitwidth % 8 != 0 {
             // Probably don't even need to implement this
             panic!();

@@ -38,7 +38,7 @@ impl CheckedFromU64 for u64 {
     }
 }
 
-impl CheckedFromU64 for i32 {
+impl CheckedFromU64 for i64 {
     fn from(u: u64) -> Result<Self, Error> {
         match Self::try_from(u) {
             Ok(n) => Ok(n),
@@ -48,6 +48,15 @@ impl CheckedFromU64 for i32 {
 }
 
 impl CheckedFromU64 for u32 {
+    fn from(u: u64) -> Result<Self, Error> {
+        match Self::try_from(u) {
+            Ok(n) => Ok(n),
+            Err(_) => Err(Error::IntSizeViolation),
+        }
+    }
+}
+
+impl CheckedFromU64 for i32 {
     fn from(u: u64) -> Result<Self, Error> {
         match Self::try_from(u) {
             Ok(n) => Ok(n),
@@ -139,7 +148,8 @@ impl ByteReader {
             0x36 => inst!(Store::new(32, self.read_int()?, self.read_int()?)),
             0x6A => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Add)),
             0x6B => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Sub)),
-            0x41 => inst!(I32Const::new(self.read_int::<i32>()?)),
+            0x41 => inst!(ConstOp::new(Value::new(self.read_int::<i32>()?))),
+            0x42 => inst!(ConstOp::new(Value::new(self.read_int::<i64>()?))),
             x => {
                 return Err(Error::UnknownOpcode(x));
             }

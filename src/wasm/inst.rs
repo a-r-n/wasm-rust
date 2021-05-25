@@ -2,109 +2,24 @@ use super::*;
 
 use std::num::Wrapping;
 
-pub struct I32Const {
+pub struct ConstOp {
     value: Value,
 }
 
-impl I32Const {
-    pub fn new(v: i32) -> Self {
-        I32Const {
-            value: Value {
-                t: PrimitiveType::I32,
-                v: InternalValue { i32: v },
-            },
-        }
+impl ConstOp {
+    pub fn new(value: Value) -> Self {
+        Self { value }
     }
 }
 
-impl Instruction for I32Const {
+impl Instruction for ConstOp {
     fn execute(
         &self,
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
-        stack.push_value(self.value);
-        Ok(ControlInfo::None)
-    }
-}
-
-pub struct I64Const {
-    value: Value,
-}
-
-impl I64Const {
-    pub fn new(v: i64) -> Self {
-        I64Const {
-            value: Value {
-                t: PrimitiveType::I64,
-                v: InternalValue { i64: v },
-            },
-        }
-    }
-}
-
-impl Instruction for I64Const {
-    fn execute(
-        &self,
-        stack: &mut Stack,
-        _: &mut Memory,
-        _: &mut Vec<Value>,
-    ) -> Result<ControlInfo, Error> {
-        stack.push_value(self.value);
-        Ok(ControlInfo::None)
-    }
-}
-
-pub struct F32Const {
-    value: Value,
-}
-
-impl F32Const {
-    pub fn new(v: f32) -> Self {
-        F32Const {
-            value: Value {
-                t: PrimitiveType::F32,
-                v: InternalValue { f32: v },
-            },
-        }
-    }
-}
-
-impl Instruction for F32Const {
-    fn execute(
-        &self,
-        stack: &mut Stack,
-        _: &mut Memory,
-        _: &mut Vec<Value>,
-    ) -> Result<ControlInfo, Error> {
-        stack.push_value(self.value);
-        Ok(ControlInfo::None)
-    }
-}
-
-pub struct F64Const {
-    value: Value,
-}
-
-impl F64Const {
-    pub fn new(v: f64) -> Self {
-        F64Const {
-            value: Value {
-                t: PrimitiveType::F64,
-                v: InternalValue { f64: v },
-            },
-        }
-    }
-}
-
-impl Instruction for F64Const {
-    fn execute(
-        &self,
-        stack: &mut Stack,
-        _: &mut Memory,
-        _: &mut Vec<Value>,
-    ) -> Result<ControlInfo, Error> {
+        println!("execute const, pushing {}", self.value);
         stack.push_value(self.value);
         Ok(ControlInfo::None)
     }
@@ -162,12 +77,16 @@ impl Instruction for IBinOp {
 
         let result = match self.op_type {
             IBinOpType::Add => Value::from_explicit_type(self.result_type, (val_0 + val_1).0),
-            IBinOpType::Sub => Value::from_explicit_type(self.result_type, (val_1 - val_0).0),
+            IBinOpType::Sub => Value::from_explicit_type(self.result_type, (val_0 - val_1).0),
             _ => todo!(),
         };
 
+        println!(
+            "execute ibinop, operands {} and {}, result {}",
+            val_0, val_1, result
+        );
+
         stack.push_value(result);
-        println!("pushed {}", result);
 
         Ok(ControlInfo::None)
     }
@@ -190,6 +109,7 @@ impl Instruction for LocalGet {
         _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
+        println!("execute localget, pushing {}", locals[self.index]);
         stack.push_value(locals[self.index].clone());
         Ok(ControlInfo::None)
     }
@@ -212,6 +132,7 @@ impl Instruction for LocalSet {
         _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
+        println!("execute localset, popping {}", stack.fetch_value(0)?);
         locals[self.index] = stack.pop_value()?;
         Ok(ControlInfo::None)
     }
@@ -234,6 +155,7 @@ impl Instruction for LocalTee {
         _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
+        println!("execute localtee, fetching {}", stack.fetch_value(0)?);
         locals[self.index] = stack.fetch_value(0)?.clone();
         Ok(ControlInfo::None)
     }
@@ -278,6 +200,7 @@ impl Instruction for Load {
         _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
         let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
+        println!("execute load, reading address {}", address);
         match memory.read(self.result_type, self.load_bitwidth, address) {
             Some(s) => {
                 stack.push_value(s);
@@ -308,6 +231,7 @@ impl Instruction for Store {
     ) -> Result<ControlInfo, Error> {
         let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
         let value = unsafe { stack.pop_value()?.v.i64 } as u64;
+        println!("execute store, writing {} to address {}", value, address);
         match memory.write(value, self.bitwidth, address) {
             Some(_) => Ok(ControlInfo::None),
             None => Ok(ControlInfo::Trap(Trap::MemoryOutOfBounds)),
