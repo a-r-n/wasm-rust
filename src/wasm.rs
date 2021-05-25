@@ -163,11 +163,12 @@ impl Stack {
     }
 
     pub fn pop_value(&mut self) -> Result<Value, Error> {
+        println!("{}", self.values.len());
         match self.values.pop() {
             Some(n) => Ok(n),
             None => {
                 println!("Pop empty");
-                panic!()// Err(Error::StackViolation)
+                panic!() // Err(Error::StackViolation)
             }
         }
     }
@@ -237,7 +238,10 @@ impl Function {
     pub fn call(&mut self, memory: &mut Memory) -> Result<Value, Error> {
         let mut stack = Stack::new();
         for instruction in &self.instructions {
-            instruction.execute(&mut stack, memory, &mut self.locals)?;
+            match instruction.execute(&mut stack, memory, &mut self.locals)? {
+                ControlInfo::Trap(Trap::MemoryOutOfBounds) => panic!(),
+                _ => (),
+            };
         }
         let ret = stack.pop_value();
         stack.assert_empty()?;
@@ -263,6 +267,7 @@ impl Memory {
     }
 
     pub fn write(&mut self, mut value: u64, bitwidth: u8, address: u64) -> Option<()> {
+        println!("write to address {}", address);
         if bitwidth % 8 != 0 {
             // Probably don't even need to implement this
             panic!();

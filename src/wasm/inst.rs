@@ -154,7 +154,7 @@ impl Instruction for IBinOp {
         let op_1 = stack.pop_value()?;
         let op_0 = stack.pop_value()?;
         if op_0.t != op_1.t {
-            return Err(Error::Misc("Operant type mismatch"));
+            return Err(Error::Misc("Operand type mismatch"));
         }
 
         let val_0 = Wrapping(unsafe { op_0.v.i64 } as u64);
@@ -162,11 +162,12 @@ impl Instruction for IBinOp {
 
         let result = match self.op_type {
             IBinOpType::Add => Value::from_explicit_type(self.result_type, (val_0 + val_1).0),
-            IBinOpType::Sub => Value::from_explicit_type(self.result_type, (val_0 - val_1).0),
+            IBinOpType::Sub => Value::from_explicit_type(self.result_type, (val_1 - val_0).0),
             _ => todo!(),
         };
 
         stack.push_value(result);
+        println!("pushed {}", result);
 
         Ok(ControlInfo::None)
     }
@@ -305,8 +306,8 @@ impl Instruction for Store {
         memory: &mut Memory,
         _: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
-        let value = unsafe { stack.pop_value()?.v.i64 } as u64;
         let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
+        let value = unsafe { stack.pop_value()?.v.i64 } as u64;
         match memory.write(value, self.bitwidth, address) {
             Some(_) => Ok(ControlInfo::None),
             None => Ok(ControlInfo::Trap(Trap::MemoryOutOfBounds)),
@@ -320,9 +321,7 @@ struct Branch {
 
 impl Branch {
     pub fn new(branch_index: u32) -> Self {
-        Self {
-            branch_index,
-        }
+        Self { branch_index }
     }
 }
 
