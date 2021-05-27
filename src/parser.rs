@@ -139,6 +139,37 @@ impl ByteReader {
             0x36 => inst!(Store::new(32, self.read_int()?, self.read_int()?)),
             0x6A => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Add)),
             0x6B => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Sub)),
+            0x6C => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Mul)),
+            0x6D => inst!(IBinOp::new(
+                PrimitiveType::I32,
+                IBinOpType::Div(Signedness::Signed)
+            )),
+            0x6E => inst!(IBinOp::new(
+                PrimitiveType::I32,
+                IBinOpType::Div(Signedness::Unsigned)
+            )),
+            0x6F => inst!(IBinOp::new(
+                PrimitiveType::I32,
+                IBinOpType::Rem(Signedness::Signed)
+            )),
+            0x70 => inst!(IBinOp::new(
+                PrimitiveType::I32,
+                IBinOpType::Rem(Signedness::Unsigned)
+            )),
+            0x71 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::And)),
+            0x72 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Or)),
+            0x73 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Xor)),
+            0x74 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Shl)),
+            0x75 => inst!(IBinOp::new(
+                PrimitiveType::I32,
+                IBinOpType::Shr(Signedness::Signed)
+            )),
+            0x76 => inst!(IBinOp::new(
+                PrimitiveType::I32,
+                IBinOpType::Shr(Signedness::Unsigned)
+            )),
+            0x77 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Rotl)),
+            0x78 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Rotr)),
             0x41 => inst!(Const::new(Value::new(self.read_int::<i32>()?))),
             x => {
                 return Err(Error::UnknownOpcode(x));

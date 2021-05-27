@@ -199,6 +199,17 @@ impl Stack {
     }
 }
 
+impl std::fmt::Display for Stack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "Current stack:\n[")?;
+        for v in self.values.iter() {
+            writeln!(f, "  {}", v)?;
+        }
+        write!(f, "]\n\n")?;
+        Ok(())
+    }
+}
+
 pub trait Instruction {
     /// A wasm instruction may modify any state of the program
     fn execute(
