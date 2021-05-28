@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 pub enum Error {
     InvalidInput,
     BadVersion,

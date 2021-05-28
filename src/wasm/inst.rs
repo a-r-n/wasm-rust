@@ -145,7 +145,7 @@ impl Instruction for LocalGet {
         _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
-        stack.push_value(locals[self.index].clone());
+        stack.push_value(locals[self.index]);
         Ok(ControlInfo::None)
     }
 }
@@ -189,7 +189,7 @@ impl Instruction for LocalTee {
         _: &mut Memory,
         locals: &mut Vec<Value>,
     ) -> Result<ControlInfo, Error> {
-        locals[self.index] = stack.fetch_value(0)?.clone();
+        locals[self.index] = *stack.fetch_value(0)?;
         Ok(ControlInfo::None)
     }
 }
@@ -238,7 +238,7 @@ impl Instruction for Load {
                 stack.push_value(s);
                 Ok(ControlInfo::None)
             }
-            None => return Ok(ControlInfo::Trap(Trap::MemoryOutOfBounds)),
+            None => Ok(ControlInfo::Trap(Trap::MemoryOutOfBounds)),
         }
     }
 }

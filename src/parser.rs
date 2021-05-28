@@ -364,7 +364,7 @@ pub fn parse_wasm(path: &str) -> Result<Module, Error> {
     let mut start = 8;
     while start < buf.len() {
         let section_type: u8 = buf[start];
-        let (section_length, bytes_read) = parse_leb128(&mut &buf[start + 1..]);
+        let (section_length, bytes_read) = parse_leb128(&buf[start + 1..]);
         let section_end = 1 + bytes_read + section_length as usize;
 
         sections.push(ModuleSection::new(
