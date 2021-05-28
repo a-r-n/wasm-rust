@@ -91,8 +91,6 @@ impl Instruction for IBinOp {
                     IBinOpType::Rotr => val_0.0.rotate_right(val_1.0 as u32),
                 };
 
-                println!("{}", calc);
-
                 Value::from_explicit_type(self.result_type, calc as u64)
             }
             PrimitiveType::I64 => {

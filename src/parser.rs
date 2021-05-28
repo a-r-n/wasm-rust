@@ -8,8 +8,8 @@ use crate::wasm::inst::*;
 use crate::wasm::*;
 
 /// Returns (value, length read)
-fn parse_leb128(bytes: &[u8]) -> (u64, usize) {
-    let mut value = 0_u64;
+fn parse_unsigned_leb128(bytes: &[u8]) -> (u64, usize) {
+    let mut value = 0;
     let mut offset = 0_usize;
     while bytes[offset] & (1_u8 << 7) != 0 {
         value += ((bytes[offset] & 0b01111111) as u64) << (7 * offset);
@@ -19,6 +19,24 @@ fn parse_leb128(bytes: &[u8]) -> (u64, usize) {
     offset += 1;
 
     (value, offset)
+}
+
+fn parse_signed_leb128(bytes: &[u8]) -> (i64, usize) {
+    let mut value = 0;
+    let mut offset = 0_usize;
+    while bytes[offset] & (1_u8 << 7) != 0 {
+        value += ((bytes[offset] & 0b01111111) as u64) << (7 * offset);
+        offset += 1;
+    }
+    value += ((bytes[offset] & 0b01111111) as u64) << (7 * offset);
+    offset += 1;
+
+    // sign extension needed if the highest bit of the parsed number is 1
+    if (7 * offset) < 64 && bytes[offset - 1] & 1_u8 << 6 != 0 {
+        value |= !0_u64 << (7 * offset);
+    }
+
+    (value as i64, offset)
 }
 
 struct ByteReader {
@@ -38,15 +56,6 @@ impl CheckedFromU64 for u64 {
     }
 }
 
-impl CheckedFromU64 for i32 {
-    fn from(u: u64) -> Result<Self, Error> {
-        match Self::try_from(u) {
-            Ok(n) => Ok(n),
-            Err(_) => Err(Error::IntSizeViolation),
-        }
-    }
-}
-
 impl CheckedFromU64 for u32 {
     fn from(u: u64) -> Result<Self, Error> {
         match Self::try_from(u) {
@@ -58,6 +67,42 @@ impl CheckedFromU64 for u32 {
 
 impl CheckedFromU64 for usize {
     fn from(u: u64) -> Result<Self, Error> {
+        match Self::try_from(u) {
+            Ok(n) => Ok(n),
+            Err(_) => Err(Error::IntSizeViolation),
+        }
+    }
+}
+
+impl CheckedFromU64 for i64 {
+    fn from(u: u64) -> Result<Self, Error> {
+        Ok(u as i64)
+    }
+}
+
+impl CheckedFromU64 for i32 {
+    fn from(u: u64) -> Result<Self, Error> {
+        match Self::try_from(u) {
+            Ok(n) => Ok(n),
+            Err(_) => Err(Error::IntSizeViolation),
+        }
+    }
+}
+
+trait CheckedFromI64 {
+    fn from(u: i64) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+
+impl CheckedFromI64 for i64 {
+    fn from(u: i64) -> Result<Self, Error> {
+        Ok(u)
+    }
+}
+
+impl CheckedFromI64 for i32 {
+    fn from(u: i64) -> Result<Self, Error> {
         match Self::try_from(u) {
             Ok(n) => Ok(n),
             Err(_) => Err(Error::IntSizeViolation),
@@ -99,7 +144,14 @@ impl ByteReader {
     }
 
     fn read_int<I: CheckedFromU64>(&mut self) -> Result<I, Error> {
-        let (value, read_bytes) = parse_leb128(&self.content[self.offset..]);
+        let (value, read_bytes) = parse_unsigned_leb128(&self.content[self.offset..]);
+        self.offset += read_bytes;
+        Ok(I::from(value)?)
+    }
+
+    // same as `read_int`, but uses signed leb128 decoding
+    fn read_signed_int<I: CheckedFromI64>(&mut self) -> Result<I, Error> {
+        let (value, read_bytes) = parse_signed_leb128(&self.content[self.offset..]);
         self.offset += read_bytes;
         Ok(I::from(value)?)
     }
@@ -170,10 +222,9 @@ impl ByteReader {
             )),
             0x77 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Rotl)),
             0x78 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Rotr)),
-            0x41 => inst!(Const::new(Value::new(self.read_int::<i32>()?))),
-            x => {
-                return Err(Error::UnknownOpcode(x));
-            }
+            0x41 => inst!(Const::new(Value::new(self.read_signed_int::<i32>()?))),
+            0x42 => inst!(Const::new(Value::new(self.read_signed_int::<i64>()?))),
+            x => Err(Error::UnknownOpcode(x)),
         }
     }
 
@@ -231,7 +282,7 @@ impl ModuleSection {
             // for i in 0..content.len() {
             //     print!("{:02X} ", content[i]);
             // }
-            // println!();
+            // eprintln!();
         }
         ModuleSection {
             section_type,
@@ -330,7 +381,7 @@ impl ModuleSection {
                 }
             }
             x => {
-                println!("Unimplemented section: {:X}", x)
+                eprintln!("Unimplemented section: {:X}", x)
                 // return Err(Error::UnknownSection);
             }
         }
@@ -364,7 +415,7 @@ pub fn parse_wasm(path: &str) -> Result<Module, Error> {
     let mut start = 8;
     while start < buf.len() {
         let section_type: u8 = buf[start];
-        let (section_length, bytes_read) = parse_leb128(&buf[start + 1..]);
+        let (section_length, bytes_read) = parse_unsigned_leb128(&buf[start + 1..]);
         let section_end = 1 + bytes_read + section_length as usize;
 
         sections.push(ModuleSection::new(
