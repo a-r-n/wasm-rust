@@ -102,8 +102,8 @@ impl TryFrom<Value> for u32 {
     }
 }
 
-impl From<PrimitiveType> for Value {
-    fn from(x: PrimitiveType) -> Value {
+impl From<&PrimitiveType> for Value {
+    fn from(x: &PrimitiveType) -> Value {
         match x {
             PrimitiveType::I32 => Value::new(0_i32),
             PrimitiveType::I64 => Value::new(0_i64),
@@ -236,9 +236,13 @@ pub struct Function {
 
 impl Function {
     pub fn new(r#type: FunctionType) -> Self {
+        let mut locals = Vec::with_capacity(r#type.params.len());
+        for t in r#type.params.iter() {
+            locals.push(Value::from(t));
+        }
         Self {
             r#type,
-            locals: Vec::new(),
+            locals,
             instructions: Vec::new(),
         }
     }

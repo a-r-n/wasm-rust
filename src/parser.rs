@@ -367,7 +367,7 @@ impl ModuleSection {
                     for _ in 0..locals_types {
                         let num_locals: usize = self.content.read_int()?; // number of locals of type `typ`
                         let typ = self.content.read_primitive_type()?;
-                        let value = Value::from(typ);
+                        let value = Value::from(&typ);
                         function.new_locals(num_locals, value);
                     }
 
