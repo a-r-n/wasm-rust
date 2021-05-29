@@ -37,7 +37,7 @@ fn handle_error<T>(x: Result<T, Error>) -> T {
 fn main() {
     env_logger::init();
     println!("enter main");
-    let mut module = handle_error(parse_wasm("test_inputs/negative_multiplication.wasm"));
+    let mut module = handle_error(parse_wasm("test_inputs/binops.wasm"));
     let ret_val = handle_error(module.call("main"));
     println!("Final value: {}", ret_val);
     // return module.call_external("main");

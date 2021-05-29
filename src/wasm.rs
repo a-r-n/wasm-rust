@@ -137,6 +137,7 @@ impl std::fmt::Display for Value {
 /// Represents expected runtime errors, i.e. problems with the program, not the interpreter
 pub enum Trap {
     MemoryOutOfBounds,
+    UndefinedDivision,
 }
 
 pub enum ControlInfo {
@@ -250,11 +251,19 @@ impl Function {
         self.locals.push(v);
     }
 
+    pub fn new_locals(&mut self, count: usize, v: Value) {
+        self.locals.reserve(count);
+        for _ in 0..count {
+            self.locals.push(v);
+        }
+    }
+
     pub fn call(&mut self, memory: &mut Memory) -> Result<Value, Error> {
         let mut stack = Stack::new();
         for instruction in &self.instructions {
             match instruction.execute(&mut stack, memory, &mut self.locals)? {
-                ControlInfo::Trap(Trap::MemoryOutOfBounds) => panic!(),
+                ControlInfo::Trap(Trap::MemoryOutOfBounds) => panic!(), //TODO: don't panic, handle traps gracefully
+                ControlInfo::Trap(Trap::UndefinedDivision) => panic!(),
                 _ => (),
             };
         }

@@ -73,43 +73,93 @@ impl Instruction for IBinOp {
 
         let result = match self.result_type {
             PrimitiveType::I32 => {
-                let val_0 = Wrapping(unsafe { op_0.v.i32 });
-                let val_1 = Wrapping(unsafe { op_1.v.i32 });
+                let val_0 = unsafe { op_0.v.i32 };
+                let val_1 = unsafe { op_1.v.i32 };
 
+                type SignedT = i32;
+                type UnsignedT = u32;
                 let calc = match self.op_type {
-                    IBinOpType::Add => (val_0 + val_1).0,
-                    IBinOpType::Sub => (val_0 - val_1).0,
-                    IBinOpType::Mul => (val_0 * val_1).0,
-                    IBinOpType::Div(_) => todo!(),
-                    IBinOpType::Rem(_) => todo!(),
-                    IBinOpType::And => (val_0 & val_1).0,
-                    IBinOpType::Or => (val_0 | val_1).0,
-                    IBinOpType::Xor => (val_0 ^ val_1).0,
-                    IBinOpType::Shl => val_0.0 << val_1.0,
-                    IBinOpType::Shr(_) => todo!(),
-                    IBinOpType::Rotl => val_0.0.rotate_left(val_1.0 as u32),
-                    IBinOpType::Rotr => val_0.0.rotate_right(val_1.0 as u32),
+                    IBinOpType::Add => val_0.wrapping_add(val_1),
+                    IBinOpType::Sub => val_0.wrapping_sub(val_1),
+                    IBinOpType::Mul => val_0.wrapping_mul(val_1),
+                    IBinOpType::Div(Signedness::Signed) => match val_0.checked_div(val_1) {
+                        // checked_div will catch division by zero and TYPE_MIN / -1
+                        Some(v) => v,
+                        None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                    },
+                    IBinOpType::Div(Signedness::Unsigned) => {
+                        match (val_0 as UnsignedT).checked_div(val_1 as UnsignedT) {
+                            Some(v) => v as SignedT,
+                            None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                        }
+                    }
+                    IBinOpType::Rem(Signedness::Signed) => match val_0.checked_rem(val_1) {
+                        Some(v) => v,
+                        None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                    },
+                    IBinOpType::Rem(Signedness::Unsigned) => {
+                        match (val_0 as UnsignedT).checked_rem(val_1 as UnsignedT) {
+                            Some(v) => v as SignedT,
+                            None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                        }
+                    }
+                    IBinOpType::And => (val_0 & val_1),
+                    IBinOpType::Or => (val_0 | val_1),
+                    IBinOpType::Xor => (val_0 ^ val_1),
+                    // shifts are modular in val_1, ie. shifting by 34 == shifting by 2
+                    IBinOpType::Shl => val_0.wrapping_shl(val_1 as u32),
+                    IBinOpType::Shr(Signedness::Signed) => val_0.wrapping_shr(val_1 as u32),
+                    IBinOpType::Shr(Signedness::Unsigned) => {
+                        (val_0 as UnsignedT).wrapping_shr(val_1 as u32) as SignedT
+                    }
+                    IBinOpType::Rotl => val_0.rotate_left(val_1 as u32),
+                    IBinOpType::Rotr => val_0.rotate_right(val_1 as u32),
                 };
 
                 Value::from_explicit_type(self.result_type, calc as u64)
             }
             PrimitiveType::I64 => {
-                let val_0 = Wrapping(unsafe { op_0.v.i64 });
-                let val_1 = Wrapping(unsafe { op_1.v.i64 });
+                let val_0 = unsafe { op_0.v.i64 };
+                let val_1 = unsafe { op_1.v.i64 };
 
+                type SignedT = i64;
+                type UnsignedT = u64;
                 let calc = match self.op_type {
-                    IBinOpType::Add => (val_0 + val_1).0,
-                    IBinOpType::Sub => (val_0 - val_1).0,
-                    IBinOpType::Mul => (val_0 * val_1).0,
-                    IBinOpType::Div(_) => todo!(),
-                    IBinOpType::Rem(_) => todo!(),
-                    IBinOpType::And => (val_0 & val_1).0,
-                    IBinOpType::Or => (val_0 | val_1).0,
-                    IBinOpType::Xor => (val_0 ^ val_1).0,
-                    IBinOpType::Shl => val_0.0 << val_1.0,
-                    IBinOpType::Shr(_) => todo!(),
-                    IBinOpType::Rotl => val_0.0.rotate_left(val_1.0 as u32),
-                    IBinOpType::Rotr => val_0.0.rotate_right(val_1.0 as u32),
+                    IBinOpType::Add => val_0.wrapping_add(val_1),
+                    IBinOpType::Sub => val_0.wrapping_sub(val_1),
+                    IBinOpType::Mul => val_0.wrapping_mul(val_1),
+                    IBinOpType::Div(Signedness::Signed) => match val_0.checked_div(val_1) {
+                        // checked_div will catch division by zero and TYPE_MIN / -1
+                        Some(v) => v,
+                        None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                    },
+                    IBinOpType::Div(Signedness::Unsigned) => {
+                        match (val_0 as UnsignedT).checked_div(val_1 as UnsignedT) {
+                            Some(v) => v as SignedT,
+                            None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                        }
+                    }
+                    IBinOpType::Rem(Signedness::Signed) => match val_0.checked_rem(val_1) {
+                        Some(v) => v,
+                        None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                    },
+                    IBinOpType::Rem(Signedness::Unsigned) => {
+                        match (val_0 as UnsignedT).checked_rem(val_1 as UnsignedT) {
+                            Some(v) => v as SignedT,
+                            None => return Ok(ControlInfo::Trap(Trap::UndefinedDivision)),
+                        }
+                    }
+                    IBinOpType::And => (val_0 & val_1),
+                    IBinOpType::Or => (val_0 | val_1),
+                    IBinOpType::Xor => (val_0 ^ val_1),
+                    // shifts are modular in val_1, ie. shifting by 34 == shifting by 2
+                    IBinOpType::Shl => val_0.wrapping_shl(val_1 as u32),
+                    IBinOpType::Shr(Signedness::Signed) => val_0.wrapping_shr(val_1 as u32),
+                    IBinOpType::Shr(Signedness::Unsigned) => {
+                        (val_0 as UnsignedT).wrapping_shr(val_1 as u32) as SignedT
+                    }
+                    IBinOpType::Rotl => val_0.rotate_left(val_1 as u32),
+                    IBinOpType::Rotr => val_0.rotate_right(val_1 as u32),
                 };
 
                 Value::from_explicit_type(self.result_type, calc as u64)

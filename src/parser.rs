@@ -361,12 +361,14 @@ impl ModuleSection {
                     let _function_len_bytes = self.content.read_int::<usize>()?; /* Needs to be read, but we don't use it */
                     let function = module.get_mut_function(function_index);
 
-                    let locals_vec_len = self.content.read_int()?;
-                    for _ in 0..locals_vec_len {
-                        let _t_vec: usize = self.content.read_int()?; // For vector types (I think) which we don't currently support -ARN
-                        let t = self.content.read_primitive_type()?;
-                        let value = Value::from(t);
-                        function.new_local(value);
+                    // length of the implicit vector containing one tuple (count, type) for each type of local
+                    let locals_types = self.content.read_int()?;
+
+                    for _ in 0..locals_types {
+                        let num_locals: usize = self.content.read_int()?; // number of locals of type `typ`
+                        let typ = self.content.read_primitive_type()?;
+                        let value = Value::from(typ);
+                        function.new_locals(num_locals, value);
                     }
 
                     loop {
