@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
@@ -156,8 +157,28 @@ impl ByteReader {
         Ok(I::from(value)?)
     }
 
+    fn read_f32(&mut self) -> Result<f32, Error> {
+        let value = f32::from_le_bytes(
+            (&self.content[self.offset..self.offset + 4])
+                .try_into()
+                .map_err(|_| Error::FloatSizeViolation)?,
+        );
+        self.offset += 4;
+        Ok(value)
+    }
+
+    fn read_f64(&mut self) -> Result<f64, Error> {
+        let value = f64::from_le_bytes(
+            (&self.content[self.offset..self.offset + 8])
+                .try_into()
+                .map_err(|_| Error::FloatSizeViolation)?,
+        );
+        self.offset += 8;
+        Ok(value)
+    }
+
     fn read_inst(&mut self) -> Result<Option<Box<dyn Instruction>>, Error> {
-        let opcode = self.read_int::<u64>()?;
+        let opcode = self.read_byte()?;
         match opcode {
             0x0B => Ok(None),
             // 0x0C => inst!()
@@ -189,6 +210,119 @@ impl ByteReader {
                 self.read_int()?
             )),
             0x36 => inst!(Store::new(32, self.read_int()?, self.read_int()?)),
+            0x41 => inst!(Const::new(Value::new(self.read_signed_int::<i32>()?))),
+            0x42 => inst!(Const::new(Value::new(self.read_signed_int::<i64>()?))),
+            0x43 => inst!(Const::new(Value::new(self.read_f32()?))),
+            0x44 => inst!(Const::new(Value::new(self.read_f64()?))),
+            0x45 => inst!(ITestOpEqz::new(PrimitiveType::I32)),
+            0x46 => inst!(RelOp::new(PrimitiveType::I32, RelOpType::Eq)),
+            0x47 => inst!(RelOp::new(PrimitiveType::I32, RelOpType::Neq)),
+            0x48 => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Lt(Signedness::Signed)
+            )),
+            0x49 => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Lt(Signedness::Unsigned)
+            )),
+            0x4A => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Gt(Signedness::Signed)
+            )),
+            0x4B => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Gt(Signedness::Unsigned)
+            )),
+            0x4C => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Le(Signedness::Signed)
+            )),
+            0x4D => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Le(Signedness::Unsigned)
+            )),
+            0x4E => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Ge(Signedness::Signed)
+            )),
+            0x4F => inst!(RelOp::new(
+                PrimitiveType::I32,
+                RelOpType::Ge(Signedness::Unsigned)
+            )),
+            0x50 => inst!(ITestOpEqz::new(PrimitiveType::I64)),
+            0x51 => inst!(RelOp::new(PrimitiveType::I64, RelOpType::Eq)),
+            0x52 => inst!(RelOp::new(PrimitiveType::I64, RelOpType::Neq)),
+            0x53 => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Lt(Signedness::Signed)
+            )),
+            0x54 => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Lt(Signedness::Unsigned)
+            )),
+            0x55 => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Gt(Signedness::Signed)
+            )),
+            0x56 => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Gt(Signedness::Unsigned)
+            )),
+            0x57 => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Le(Signedness::Signed)
+            )),
+            0x58 => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Le(Signedness::Unsigned)
+            )),
+            0x59 => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Ge(Signedness::Signed)
+            )),
+            0x5A => inst!(RelOp::new(
+                PrimitiveType::I64,
+                RelOpType::Ge(Signedness::Unsigned)
+            )),
+            0x5B => inst!(RelOp::new(PrimitiveType::F32, RelOpType::Eq)),
+            0x5C => inst!(RelOp::new(PrimitiveType::F32, RelOpType::Neq)),
+            0x5D => inst!(RelOp::new(
+                PrimitiveType::F32,
+                RelOpType::Lt(Signedness::Signed)
+            )),
+            0x5E => inst!(RelOp::new(
+                PrimitiveType::F32,
+                RelOpType::Gt(Signedness::Signed)
+            )),
+            0x5F => inst!(RelOp::new(
+                PrimitiveType::F32,
+                RelOpType::Le(Signedness::Signed)
+            )),
+            0x60 => inst!(RelOp::new(
+                PrimitiveType::F32,
+                RelOpType::Ge(Signedness::Signed)
+            )),
+            0x61 => inst!(RelOp::new(PrimitiveType::F64, RelOpType::Eq)),
+            0x62 => inst!(RelOp::new(PrimitiveType::F64, RelOpType::Neq)),
+            0x63 => inst!(RelOp::new(
+                PrimitiveType::F64,
+                RelOpType::Lt(Signedness::Signed)
+            )),
+            0x64 => inst!(RelOp::new(
+                PrimitiveType::F64,
+                RelOpType::Gt(Signedness::Signed)
+            )),
+            0x65 => inst!(RelOp::new(
+                PrimitiveType::F64,
+                RelOpType::Le(Signedness::Signed)
+            )),
+            0x66 => inst!(RelOp::new(
+                PrimitiveType::F64,
+                RelOpType::Ge(Signedness::Signed)
+            )),
+            0x67 => inst!(IUnOp::new(PrimitiveType::I32, IUnOpType::Clz)),
+            0x68 => inst!(IUnOp::new(PrimitiveType::I32, IUnOpType::Ctz)),
+            0x69 => inst!(IUnOp::new(PrimitiveType::I32, IUnOpType::Popcnt)),
             0x6A => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Add)),
             0x6B => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Sub)),
             0x6C => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Mul)),
@@ -222,9 +356,247 @@ impl ByteReader {
             )),
             0x77 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Rotl)),
             0x78 => inst!(IBinOp::new(PrimitiveType::I32, IBinOpType::Rotr)),
-            0x41 => inst!(Const::new(Value::new(self.read_signed_int::<i32>()?))),
-            0x42 => inst!(Const::new(Value::new(self.read_signed_int::<i64>()?))),
-            x => Err(Error::UnknownOpcode(x)),
+
+            0x79 => inst!(IUnOp::new(PrimitiveType::I64, IUnOpType::Clz)),
+            0x7A => inst!(IUnOp::new(PrimitiveType::I64, IUnOpType::Ctz)),
+            0x7B => inst!(IUnOp::new(PrimitiveType::I64, IUnOpType::Popcnt)),
+            0x7C => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Add)),
+            0x7D => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Sub)),
+            0x7E => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Mul)),
+            0x7F => inst!(IBinOp::new(
+                PrimitiveType::I64,
+                IBinOpType::Div(Signedness::Signed)
+            )),
+            0x80 => inst!(IBinOp::new(
+                PrimitiveType::I64,
+                IBinOpType::Div(Signedness::Unsigned)
+            )),
+            0x81 => inst!(IBinOp::new(
+                PrimitiveType::I64,
+                IBinOpType::Rem(Signedness::Signed)
+            )),
+            0x82 => inst!(IBinOp::new(
+                PrimitiveType::I64,
+                IBinOpType::Rem(Signedness::Unsigned)
+            )),
+            0x83 => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::And)),
+            0x84 => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Or)),
+            0x85 => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Xor)),
+            0x86 => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Shl)),
+            0x87 => inst!(IBinOp::new(
+                PrimitiveType::I64,
+                IBinOpType::Shr(Signedness::Signed)
+            )),
+            0x88 => inst!(IBinOp::new(
+                PrimitiveType::I64,
+                IBinOpType::Shr(Signedness::Unsigned)
+            )),
+            0x89 => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Rotl)),
+            0x8A => inst!(IBinOp::new(PrimitiveType::I64, IBinOpType::Rotr)),
+
+            0x8B => inst!(FUnOp::new(PrimitiveType::F32, FUnOpType::Abs)),
+            0x8C => inst!(FUnOp::new(PrimitiveType::F32, FUnOpType::Neg)),
+            0x8D => inst!(FUnOp::new(PrimitiveType::F32, FUnOpType::Ceil)),
+            0x8E => inst!(FUnOp::new(PrimitiveType::F32, FUnOpType::Floor)),
+            0x8F => inst!(FUnOp::new(PrimitiveType::F32, FUnOpType::Trunc)),
+            0x90 => inst!(FUnOp::new(PrimitiveType::F32, FUnOpType::Nearest)),
+            0x91 => inst!(FUnOp::new(PrimitiveType::F32, FUnOpType::Sqrt)),
+            0x92 => inst!(FBinOp::new(PrimitiveType::F32, FBinOpType::Add)),
+            0x93 => inst!(FBinOp::new(PrimitiveType::F32, FBinOpType::Sub)),
+            0x94 => inst!(FBinOp::new(PrimitiveType::F32, FBinOpType::Mul)),
+            0x95 => inst!(FBinOp::new(PrimitiveType::F32, FBinOpType::Div)),
+            0x96 => inst!(FBinOp::new(PrimitiveType::F32, FBinOpType::Min)),
+            0x97 => inst!(FBinOp::new(PrimitiveType::F32, FBinOpType::Max)),
+            0x98 => inst!(FBinOp::new(PrimitiveType::F32, FBinOpType::CopySign)),
+
+            0x99 => inst!(FUnOp::new(PrimitiveType::F64, FUnOpType::Abs)),
+            0x9A => inst!(FUnOp::new(PrimitiveType::F64, FUnOpType::Neg)),
+            0x9B => inst!(FUnOp::new(PrimitiveType::F64, FUnOpType::Ceil)),
+            0x9C => inst!(FUnOp::new(PrimitiveType::F64, FUnOpType::Floor)),
+            0x9D => inst!(FUnOp::new(PrimitiveType::F64, FUnOpType::Trunc)),
+            0x9E => inst!(FUnOp::new(PrimitiveType::F64, FUnOpType::Nearest)),
+            0x9F => inst!(FUnOp::new(PrimitiveType::F64, FUnOpType::Sqrt)),
+            0xA0 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::Add)),
+            0xA1 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::Sub)),
+            0xA2 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::Mul)),
+            0xA3 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::Div)),
+            0xA4 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::Min)),
+            0xA5 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::Max)),
+            0xA6 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::CopySign)),
+
+            0xA7 => inst!(CvtOp::new(
+                PrimitiveType::I64,
+                PrimitiveType::I32,
+                CvtOpType::Wrap,
+            )),
+            0xA8 => inst!(CvtOp::new(
+                PrimitiveType::F32,
+                PrimitiveType::I32,
+                CvtOpType::Trunc(Signedness::Signed)
+            )),
+            0xA9 => inst!(CvtOp::new(
+                PrimitiveType::F32,
+                PrimitiveType::I32,
+                CvtOpType::Trunc(Signedness::Unsigned)
+            )),
+            0xAA => inst!(CvtOp::new(
+                PrimitiveType::F64,
+                PrimitiveType::I32,
+                CvtOpType::Trunc(Signedness::Signed)
+            )),
+            0xAB => inst!(CvtOp::new(
+                PrimitiveType::F64,
+                PrimitiveType::I32,
+                CvtOpType::Trunc(Signedness::Unsigned)
+            )),
+            0xAC => inst!(CvtOp::new(
+                PrimitiveType::I32,
+                PrimitiveType::I64,
+                CvtOpType::Extend(Signedness::Signed)
+            )),
+            0xAD => inst!(CvtOp::new(
+                PrimitiveType::I32,
+                PrimitiveType::I64,
+                CvtOpType::Extend(Signedness::Unsigned)
+            )),
+            0xAE => inst!(CvtOp::new(
+                PrimitiveType::F32,
+                PrimitiveType::I64,
+                CvtOpType::Trunc(Signedness::Signed)
+            )),
+            0xAF => inst!(CvtOp::new(
+                PrimitiveType::F32,
+                PrimitiveType::I64,
+                CvtOpType::Trunc(Signedness::Unsigned)
+            )),
+            0xB0 => inst!(CvtOp::new(
+                PrimitiveType::F64,
+                PrimitiveType::I64,
+                CvtOpType::Trunc(Signedness::Signed)
+            )),
+            0xB1 => inst!(CvtOp::new(
+                PrimitiveType::F64,
+                PrimitiveType::I64,
+                CvtOpType::Trunc(Signedness::Unsigned)
+            )),
+            0xB2 => inst!(CvtOp::new(
+                PrimitiveType::I32,
+                PrimitiveType::F32,
+                CvtOpType::Convert(Signedness::Signed)
+            )),
+            0xB3 => inst!(CvtOp::new(
+                PrimitiveType::I32,
+                PrimitiveType::F32,
+                CvtOpType::Convert(Signedness::Unsigned)
+            )),
+            0xB4 => inst!(CvtOp::new(
+                PrimitiveType::I64,
+                PrimitiveType::F32,
+                CvtOpType::Convert(Signedness::Signed)
+            )),
+            0xB5 => inst!(CvtOp::new(
+                PrimitiveType::I64,
+                PrimitiveType::F32,
+                CvtOpType::Convert(Signedness::Unsigned)
+            )),
+
+            0xB6 => inst!(CvtOp::new(
+                PrimitiveType::F64,
+                PrimitiveType::F32,
+                CvtOpType::Demote
+            )),
+            0xB7 => inst!(CvtOp::new(
+                PrimitiveType::I32,
+                PrimitiveType::F64,
+                CvtOpType::Convert(Signedness::Signed)
+            )),
+            0xB8 => inst!(CvtOp::new(
+                PrimitiveType::I32,
+                PrimitiveType::F64,
+                CvtOpType::Convert(Signedness::Unsigned)
+            )),
+            0xB9 => inst!(CvtOp::new(
+                PrimitiveType::I64,
+                PrimitiveType::F64,
+                CvtOpType::Convert(Signedness::Signed)
+            )),
+            0xBA => inst!(CvtOp::new(
+                PrimitiveType::I64,
+                PrimitiveType::F64,
+                CvtOpType::Convert(Signedness::Unsigned)
+            )),
+            0xBB => inst!(CvtOp::new(
+                PrimitiveType::F32,
+                PrimitiveType::F64,
+                CvtOpType::Promote
+            )),
+
+            0xBC => inst!(CvtOp::new(
+                PrimitiveType::F32,
+                PrimitiveType::I32,
+                CvtOpType::Reinterpret
+            )),
+            0xBD => inst!(CvtOp::new(
+                PrimitiveType::F64,
+                PrimitiveType::I64,
+                CvtOpType::Reinterpret
+            )),
+            0xBE => inst!(CvtOp::new(
+                PrimitiveType::I32,
+                PrimitiveType::F32,
+                CvtOpType::Reinterpret
+            )),
+            0xBF => inst!(CvtOp::new(
+                PrimitiveType::I64,
+                PrimitiveType::F64,
+                CvtOpType::Reinterpret
+            )),
+
+            0xFC => match self.read_byte()? {
+                0x0 => inst!(CvtOp::new(
+                    PrimitiveType::F32,
+                    PrimitiveType::I32,
+                    CvtOpType::TruncSat(Signedness::Signed)
+                )),
+                0x1 => inst!(CvtOp::new(
+                    PrimitiveType::F32,
+                    PrimitiveType::I32,
+                    CvtOpType::TruncSat(Signedness::Unsigned)
+                )),
+                0x2 => inst!(CvtOp::new(
+                    PrimitiveType::F64,
+                    PrimitiveType::I32,
+                    CvtOpType::TruncSat(Signedness::Signed)
+                )),
+                0x3 => inst!(CvtOp::new(
+                    PrimitiveType::F64,
+                    PrimitiveType::I32,
+                    CvtOpType::TruncSat(Signedness::Unsigned)
+                )),
+                0x4 => inst!(CvtOp::new(
+                    PrimitiveType::F32,
+                    PrimitiveType::I64,
+                    CvtOpType::TruncSat(Signedness::Signed)
+                )),
+                0x5 => inst!(CvtOp::new(
+                    PrimitiveType::F32,
+                    PrimitiveType::I64,
+                    CvtOpType::TruncSat(Signedness::Unsigned)
+                )),
+                0x6 => inst!(CvtOp::new(
+                    PrimitiveType::F64,
+                    PrimitiveType::I64,
+                    CvtOpType::TruncSat(Signedness::Signed)
+                )),
+                0x7 => inst!(CvtOp::new(
+                    PrimitiveType::F64,
+                    PrimitiveType::I64,
+                    CvtOpType::TruncSat(Signedness::Unsigned)
+                )),
+                x => Err(Error::UnknownSecondaryOpcode(x as u64)),
+            },
+
+            x => Err(Error::UnknownOpcode(x as u64)),
         }
     }
 

@@ -3,8 +3,10 @@ pub enum Error {
     BadVersion,
     UnknownSection,
     UnknownOpcode(u64),
+    UnknownSecondaryOpcode(u64),
     EndOfData,
     IntSizeViolation,
+    FloatSizeViolation,
     StackViolation,
     UnexpectedData(&'static str),
     Misc(&'static str), /* Just to facilitate development for now, or for one-off errors */

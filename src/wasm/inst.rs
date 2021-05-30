@@ -67,7 +67,7 @@ impl Instruction for IBinOp {
     ) -> Result<ControlInfo, Error> {
         let op_1 = stack.pop_value()?;
         let op_0 = stack.pop_value()?;
-        if op_0.t != op_1.t {
+        if op_0.t != op_1.t || op_0.t != self.result_type {
             return Err(Error::Misc("Operand type mismatch"));
         }
 
@@ -164,15 +164,207 @@ impl Instruction for IBinOp {
 
                 Value::from_explicit_type(self.result_type, calc as u64)
             }
-            _ => {
-                panic!("IBinOp result type not an integer type");
-            }
+            _ => unreachable!(),
         };
 
         stack.push_value(result);
         log::debug!("Pushed {}", result);
 
         Ok(ControlInfo::None)
+    }
+}
+
+pub enum FBinOpType {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Min,
+    Max,
+    CopySign,
+}
+
+pub struct FBinOp {
+    result_type: PrimitiveType,
+    op_type: FBinOpType,
+}
+
+impl FBinOp {
+    pub fn new(result_type: PrimitiveType, op_type: FBinOpType) -> Self {
+        Self {
+            result_type,
+            op_type,
+        }
+    }
+}
+
+impl Instruction for FBinOp {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        unimplemented!()
+    }
+}
+
+pub enum RelOpType {
+    Eq,
+    Neq,
+    Lt(Signedness),
+    Gt(Signedness),
+    Le(Signedness),
+    Ge(Signedness),
+}
+
+pub struct RelOp {
+    result_type: PrimitiveType,
+    op_type: RelOpType,
+}
+
+impl RelOp {
+    pub fn new(result_type: PrimitiveType, op_type: RelOpType) -> Self {
+        Self {
+            result_type,
+            op_type,
+        }
+    }
+}
+
+impl Instruction for RelOp {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        unimplemented!()
+    }
+}
+
+pub struct ITestOpEqz {
+    result_type: PrimitiveType,
+}
+
+impl ITestOpEqz {
+    pub fn new(result_type: PrimitiveType) -> Self {
+        Self { result_type }
+    }
+}
+
+impl Instruction for ITestOpEqz {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        unimplemented!()
+    }
+}
+
+pub enum IUnOpType {
+    Clz,
+    Ctz,
+    Popcnt,
+}
+
+pub struct IUnOp {
+    result_type: PrimitiveType,
+    op_type: IUnOpType,
+}
+
+impl IUnOp {
+    pub fn new(result_type: PrimitiveType, op_type: IUnOpType) -> Self {
+        Self {
+            result_type,
+            op_type,
+        }
+    }
+}
+
+impl Instruction for IUnOp {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        unimplemented!()
+    }
+}
+
+pub enum FUnOpType {
+    Abs,
+    Neg,
+    Sqrt,
+    Ceil,
+    Floor,
+    Trunc,
+    Nearest,
+}
+
+pub struct FUnOp {
+    result_type: PrimitiveType,
+    op_type: FUnOpType,
+}
+
+impl FUnOp {
+    pub fn new(result_type: PrimitiveType, op_type: FUnOpType) -> Self {
+        Self {
+            result_type,
+            op_type,
+        }
+    }
+}
+
+impl Instruction for FUnOp {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        unimplemented!()
+    }
+}
+
+pub enum CvtOpType {
+    Wrap,
+    Extend(Signedness),
+    Trunc(Signedness),
+    TruncSat(Signedness),
+    Convert(Signedness),
+    Demote,
+    Promote,
+    Reinterpret,
+}
+
+pub struct CvtOp {
+    source_type: PrimitiveType,
+    result_type: PrimitiveType,
+    op_type: CvtOpType,
+}
+
+impl CvtOp {
+    pub fn new(source_type: PrimitiveType, result_type: PrimitiveType, op_type: CvtOpType) -> Self {
+        Self {
+            source_type,
+            result_type,
+            op_type,
+        }
+    }
+}
+
+impl Instruction for CvtOp {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+    ) -> Result<ControlInfo, Error> {
+        unimplemented!()
     }
 }
 
