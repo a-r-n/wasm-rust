@@ -210,6 +210,9 @@ impl ByteReader {
                 self.read_int()?
             )),
             0x36 => inst!(Store::new(32, self.read_int()?, self.read_int()?)),
+            0x37 => inst!(Store::new(64, self.read_int()?, self.read_int()?)),
+            0x38 => inst!(Store::new(32, self.read_int()?, self.read_int()?)),
+            0x39 => inst!(Store::new(64, self.read_int()?, self.read_int()?)),
             0x41 => inst!(Const::new(Value::new(self.read_signed_int::<i32>()?))),
             0x42 => inst!(Const::new(Value::new(self.read_signed_int::<i64>()?))),
             0x43 => inst!(Const::new(Value::new(self.read_f32()?))),
@@ -424,175 +427,139 @@ impl ByteReader {
             0xA5 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::Max)),
             0xA6 => inst!(FBinOp::new(PrimitiveType::F64, FBinOpType::CopySign)),
 
-            0xA7 => inst!(CvtOp::new(
-                PrimitiveType::I64,
-                PrimitiveType::I32,
-                CvtOpType::Wrap,
-            )),
-            0xA8 => inst!(CvtOp::new(
+            0xA7 => inst!(CvtOp::new(CvtOpType::Wrap)),
+            0xA8 => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Signed,
+                PrimitiveType::F32,
+                PrimitiveType::I32
+            ))),
+            0xA9 => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Unsigned,
                 PrimitiveType::F32,
                 PrimitiveType::I32,
-                CvtOpType::Trunc(Signedness::Signed)
-            )),
-            0xA9 => inst!(CvtOp::new(
-                PrimitiveType::F32,
-                PrimitiveType::I32,
-                CvtOpType::Trunc(Signedness::Unsigned)
-            )),
-            0xAA => inst!(CvtOp::new(
+            ))),
+            0xAA => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Signed,
                 PrimitiveType::F64,
                 PrimitiveType::I32,
-                CvtOpType::Trunc(Signedness::Signed)
-            )),
-            0xAB => inst!(CvtOp::new(
+            ))),
+            0xAB => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Unsigned,
                 PrimitiveType::F64,
                 PrimitiveType::I32,
-                CvtOpType::Trunc(Signedness::Unsigned)
-            )),
-            0xAC => inst!(CvtOp::new(
-                PrimitiveType::I32,
-                PrimitiveType::I64,
-                CvtOpType::Extend(Signedness::Signed)
-            )),
-            0xAD => inst!(CvtOp::new(
-                PrimitiveType::I32,
-                PrimitiveType::I64,
-                CvtOpType::Extend(Signedness::Unsigned)
-            )),
-            0xAE => inst!(CvtOp::new(
+            ))),
+            0xAC => inst!(CvtOp::new(CvtOpType::Extend(Signedness::Signed))),
+            0xAD => inst!(CvtOp::new(CvtOpType::Extend(Signedness::Unsigned))),
+            0xAE => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Signed,
                 PrimitiveType::F32,
                 PrimitiveType::I64,
-                CvtOpType::Trunc(Signedness::Signed)
-            )),
-            0xAF => inst!(CvtOp::new(
+            ))),
+            0xAF => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Unsigned,
                 PrimitiveType::F32,
                 PrimitiveType::I64,
-                CvtOpType::Trunc(Signedness::Unsigned)
-            )),
-            0xB0 => inst!(CvtOp::new(
+            ))),
+            0xB0 => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Signed,
                 PrimitiveType::F64,
                 PrimitiveType::I64,
-                CvtOpType::Trunc(Signedness::Signed)
-            )),
-            0xB1 => inst!(CvtOp::new(
+            ))),
+            0xB1 => inst!(CvtOp::new(CvtOpType::Trunc(
+                Signedness::Unsigned,
                 PrimitiveType::F64,
                 PrimitiveType::I64,
-                CvtOpType::Trunc(Signedness::Unsigned)
-            )),
-            0xB2 => inst!(CvtOp::new(
+            ))),
+            0xB2 => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Signed,
                 PrimitiveType::I32,
                 PrimitiveType::F32,
-                CvtOpType::Convert(Signedness::Signed)
-            )),
-            0xB3 => inst!(CvtOp::new(
+            ))),
+            0xB3 => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Unsigned,
                 PrimitiveType::I32,
                 PrimitiveType::F32,
-                CvtOpType::Convert(Signedness::Unsigned)
-            )),
-            0xB4 => inst!(CvtOp::new(
+            ))),
+            0xB4 => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Signed,
                 PrimitiveType::I64,
                 PrimitiveType::F32,
-                CvtOpType::Convert(Signedness::Signed)
-            )),
-            0xB5 => inst!(CvtOp::new(
+            ))),
+            0xB5 => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Unsigned,
                 PrimitiveType::I64,
                 PrimitiveType::F32,
-                CvtOpType::Convert(Signedness::Unsigned)
-            )),
+            ))),
 
-            0xB6 => inst!(CvtOp::new(
-                PrimitiveType::F64,
-                PrimitiveType::F32,
-                CvtOpType::Demote
-            )),
-            0xB7 => inst!(CvtOp::new(
+            0xB6 => inst!(CvtOp::new(CvtOpType::Demote)),
+            0xB7 => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Signed,
                 PrimitiveType::I32,
                 PrimitiveType::F64,
-                CvtOpType::Convert(Signedness::Signed)
-            )),
-            0xB8 => inst!(CvtOp::new(
+            ))),
+            0xB8 => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Unsigned,
                 PrimitiveType::I32,
                 PrimitiveType::F64,
-                CvtOpType::Convert(Signedness::Unsigned)
-            )),
-            0xB9 => inst!(CvtOp::new(
+            ))),
+            0xB9 => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Signed,
                 PrimitiveType::I64,
                 PrimitiveType::F64,
-                CvtOpType::Convert(Signedness::Signed)
-            )),
-            0xBA => inst!(CvtOp::new(
+            ))),
+            0xBA => inst!(CvtOp::new(CvtOpType::Convert(
+                Signedness::Unsigned,
                 PrimitiveType::I64,
                 PrimitiveType::F64,
-                CvtOpType::Convert(Signedness::Unsigned)
-            )),
-            0xBB => inst!(CvtOp::new(
-                PrimitiveType::F32,
-                PrimitiveType::F64,
-                CvtOpType::Promote
-            )),
+            ))),
+            0xBB => inst!(CvtOp::new(CvtOpType::Promote)),
 
-            0xBC => inst!(CvtOp::new(
-                PrimitiveType::F32,
-                PrimitiveType::I32,
-                CvtOpType::Reinterpret
-            )),
-            0xBD => inst!(CvtOp::new(
-                PrimitiveType::F64,
-                PrimitiveType::I64,
-                CvtOpType::Reinterpret
-            )),
-            0xBE => inst!(CvtOp::new(
-                PrimitiveType::I32,
-                PrimitiveType::F32,
-                CvtOpType::Reinterpret
-            )),
-            0xBF => inst!(CvtOp::new(
-                PrimitiveType::I64,
-                PrimitiveType::F64,
-                CvtOpType::Reinterpret
-            )),
+            0xBC => inst!(CvtOp::new(CvtOpType::Reinterpret(PrimitiveType::F32))),
+            0xBD => inst!(CvtOp::new(CvtOpType::Reinterpret(PrimitiveType::F64))),
+            0xBE => inst!(CvtOp::new(CvtOpType::Reinterpret(PrimitiveType::I32))),
+            0xBF => inst!(CvtOp::new(CvtOpType::Reinterpret(PrimitiveType::I64))),
 
             0xFC => match self.read_byte()? {
-                0x0 => inst!(CvtOp::new(
+                0x0 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Signed,
                     PrimitiveType::F32,
                     PrimitiveType::I32,
-                    CvtOpType::TruncSat(Signedness::Signed)
-                )),
-                0x1 => inst!(CvtOp::new(
+                ))),
+                0x1 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Unsigned,
                     PrimitiveType::F32,
                     PrimitiveType::I32,
-                    CvtOpType::TruncSat(Signedness::Unsigned)
-                )),
-                0x2 => inst!(CvtOp::new(
+                ))),
+                0x2 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Signed,
                     PrimitiveType::F64,
                     PrimitiveType::I32,
-                    CvtOpType::TruncSat(Signedness::Signed)
-                )),
-                0x3 => inst!(CvtOp::new(
+                ))),
+                0x3 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Unsigned,
                     PrimitiveType::F64,
                     PrimitiveType::I32,
-                    CvtOpType::TruncSat(Signedness::Unsigned)
-                )),
-                0x4 => inst!(CvtOp::new(
+                ))),
+                0x4 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Signed,
                     PrimitiveType::F32,
                     PrimitiveType::I64,
-                    CvtOpType::TruncSat(Signedness::Signed)
-                )),
-                0x5 => inst!(CvtOp::new(
+                ))),
+                0x5 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Unsigned,
                     PrimitiveType::F32,
                     PrimitiveType::I64,
-                    CvtOpType::TruncSat(Signedness::Unsigned)
-                )),
-                0x6 => inst!(CvtOp::new(
+                ))),
+                0x6 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Signed,
                     PrimitiveType::F64,
                     PrimitiveType::I64,
-                    CvtOpType::TruncSat(Signedness::Signed)
-                )),
-                0x7 => inst!(CvtOp::new(
+                ))),
+                0x7 => inst!(CvtOp::new(CvtOpType::TruncSat(
+                    Signedness::Unsigned,
                     PrimitiveType::F64,
                     PrimitiveType::I64,
-                    CvtOpType::TruncSat(Signedness::Unsigned)
-                )),
+                ))),
                 x => Err(Error::UnknownSecondaryOpcode(x as u64)),
             },
 

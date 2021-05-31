@@ -90,6 +90,59 @@ impl Value {
             v: InternalValue { i64: v as i64 },
         }
     }
+
+    #[inline]
+    pub fn as_i32_unchecked(&self) -> i32 {
+        unsafe { self.v.i32 }
+    }
+    #[inline]
+    pub fn as_i64_unchecked(&self) -> i64 {
+        unsafe { self.v.i64 }
+    }
+    #[inline]
+    pub fn as_f32_unchecked(&self) -> f32 {
+        unsafe { self.v.f32 }
+    }
+    #[inline]
+    pub fn as_f64_unchecked(&self) -> f64 {
+        unsafe { self.v.f64 }
+    }
+}
+
+impl From<i32> for Value {
+    fn from(v: i32) -> Self {
+        Self {
+            t: PrimitiveType::from(v),
+            v: InternalValue::from(v),
+        }
+    }
+}
+
+impl From<i64> for Value {
+    fn from(v: i64) -> Self {
+        Self {
+            t: PrimitiveType::from(v),
+            v: InternalValue::from(v),
+        }
+    }
+}
+
+impl From<f32> for Value {
+    fn from(v: f32) -> Self {
+        Self {
+            t: PrimitiveType::from(v),
+            v: InternalValue::from(v),
+        }
+    }
+}
+
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        Self {
+            t: PrimitiveType::from(v),
+            v: InternalValue::from(v),
+        }
+    }
 }
 
 impl TryFrom<Value> for u32 {
