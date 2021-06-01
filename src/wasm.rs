@@ -219,15 +219,11 @@ impl Stack {
 
     pub fn pop_value(&mut self) -> Result<Value, Error> {
         log::debug!("Current stack len {}", self.values.len());
-        match self.values.pop() {
-            Some(n) => {
-                log::debug!("Popped {}", n);
-                Ok(n)
-            }
-            None => {
-                log::debug!("Pop empty");
-                panic!() // Err(Error::StackViolation)
-            }
+
+        if self.values.is_empty() {
+            Err(Error::StackViolation)
+        } else {
+            unsafe { Ok(self.values.pop().unwrap_unchecked()) }
         }
     }
 
