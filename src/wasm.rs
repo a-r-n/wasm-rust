@@ -271,6 +271,7 @@ pub trait Instruction {
         stack: &mut Stack,
         memory: &mut Memory,
         locals: &mut Vec<Value>,
+        functions: &Vec<Function>,
     ) -> Result<ControlInfo, Error>;
 }
 
@@ -283,19 +284,15 @@ struct Table {
 
 pub struct Function {
     r#type: FunctionType,
-    locals: Vec<Value>,
+    local_types: Vec<PrimitiveType>,
     instructions: Vec<Box<dyn Instruction>>,
 }
 
 impl Function {
     pub fn new(r#type: FunctionType) -> Self {
-        let mut locals = Vec::with_capacity(r#type.params.len());
-        for t in r#type.params.iter() {
-            locals.push(Value::from(t));
-        }
         Self {
             r#type,
-            locals,
+            local_types: Vec::new(),
             instructions: Vec::new(),
         }
     }
@@ -304,29 +301,52 @@ impl Function {
         self.instructions.push(i);
     }
 
-    pub fn new_local(&mut self, v: Value) {
-        self.locals.push(v);
+    pub fn num_params(&self) -> usize {
+        self.r#type.num_params()
     }
 
-    pub fn new_locals(&mut self, count: usize, v: Value) {
-        self.locals.reserve(count);
+    pub fn num_locals(&self) -> usize {
+        self.local_types.len()
+    }
+
+    pub fn new_locals(&mut self, count: usize, t: PrimitiveType) {
+        self.local_types.reserve(count);
         for _ in 0..count {
-            self.locals.push(v);
+            self.local_types.push(t);
         }
     }
 
-    pub fn call(&mut self, memory: &mut Memory) -> Result<Value, Error> {
+    fn do_return(mut stack: Stack) -> Result<Value, Error> {
+        let ret = stack.pop_value();
+        stack.assert_empty()?;
+        ret
+    }
+
+    pub fn call(
+        &self,
+        functions: &Vec<Function>,
+        memory: &mut Memory,
+        args: Vec<Value>,
+    ) -> Result<Value, Error> {
         let mut stack = Stack::new();
+        let mut locals = Vec::with_capacity(self.num_params() + self.num_locals());
+        for arg in args {
+            locals.push(arg);
+        }
+        for t in &self.local_types {
+            locals.push(Value::from(t));
+        }
         for instruction in &self.instructions {
-            match instruction.execute(&mut stack, memory, &mut self.locals)? {
+            match instruction.execute(&mut stack, memory, &mut locals, functions)? {
+                ControlInfo::Return => {
+                    return Self::do_return(stack);
+                }
                 ControlInfo::Trap(Trap::MemoryOutOfBounds) => panic!(), //TODO: don't panic, handle traps gracefully
                 ControlInfo::Trap(Trap::UndefinedDivision) => panic!(),
                 _ => (),
             };
         }
-        let ret = stack.pop_value();
-        stack.assert_empty()?;
-        ret
+        Self::do_return(stack)
     }
 }
 
@@ -409,13 +429,21 @@ impl Memory {
 
 #[derive(Default, Clone)]
 pub struct FunctionType {
-    params: Vec<PrimitiveType>,
-    returns: Vec<PrimitiveType>,
+    pub params: Vec<PrimitiveType>,
+    pub returns: Vec<PrimitiveType>,
 }
 
 impl FunctionType {
     pub fn new(params: Vec<PrimitiveType>, returns: Vec<PrimitiveType>) -> Self {
         Self { params, returns }
+    }
+
+    pub fn num_params(&self) -> usize {
+        self.params.len()
+    }
+
+    pub fn params_iter(&self) -> std::slice::Iter<PrimitiveType> {
+        self.params.iter()
     }
 }
 
@@ -441,12 +469,12 @@ impl Module {
         Self::default()
     }
 
-    pub fn call(&mut self, function_name: &str) -> Result<Value, Error> {
+    pub fn call(&mut self, function_name: &str, args: Vec<Value>) -> Result<Value, Error> {
         let function_index = match self.exports.get(function_name) {
             Some(Export::Function(n)) => *n,
             _ => return Err(Error::Misc("On module call, given name is not a function")),
         };
-        let function = match self.functions.get_mut(function_index) {
+        let function = match self.functions.get(function_index) {
             Some(n) => n,
             None => {
                 return Err(Error::Misc(
@@ -454,7 +482,7 @@ impl Module {
                 ))
             }
         };
-        function.call(&mut self.memory)
+        function.call(&self.functions, &mut self.memory, args)
     }
 
     pub fn add_function_type(&mut self, ft: FunctionType) {

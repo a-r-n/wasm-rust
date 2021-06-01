@@ -180,8 +180,27 @@ impl ByteReader {
     fn read_inst(&mut self) -> Result<Option<Box<dyn Instruction>>, Error> {
         let opcode = self.read_byte()?;
         match opcode {
+            0x02 => {
+                let _ = self.read_int::<u64>()?; // Block type, which we might need to implement later
+                let mut block_instructions: Vec<Box<dyn Instruction>> = Vec::new();
+                while let Some(inst) = self.read_inst()? {
+                    block_instructions.push(inst);
+                }
+                inst!(Block::new(BlockContinuation::Branch, block_instructions))
+            }
+            0x03 => {
+                let _ = self.read_int::<u64>()?; // Block type, which we might need to implement later
+                let mut block_instructions: Vec<Box<dyn Instruction>> = Vec::new();
+                while let Some(inst) = self.read_inst()? {
+                    block_instructions.push(inst);
+                }
+                inst!(Block::new(BlockContinuation::Loop, block_instructions))
+            }
             0x0B => Ok(None),
-            // 0x0C => inst!()
+            0x0C => inst!(Branch::new(self.read_int()?)),
+            0x0D => inst!(BranchIf::new(self.read_int()?)),
+            0x0F => inst!(Return::new()),
+            0x10 => inst!(Call::new(self.read_int()?)),
             0x20 => inst!(LocalGet::new(self.read_int()?)),
             0x21 => inst!(LocalSet::new(self.read_int()?)),
             0x22 => inst!(LocalTee::new(self.read_int()?)),
@@ -615,14 +634,6 @@ struct ModuleSection {
 
 impl ModuleSection {
     fn new(section_type: u8, content: &[u8]) -> Self {
-        /// TODO: make a macro for this
-        #[cfg(debug)]
-        {
-            // for i in 0..content.len() {
-            //     print!("{:02X} ", content[i]);
-            // }
-            // eprintln!();
-        }
         ModuleSection {
             section_type,
             content: ByteReader::new(content),
@@ -706,8 +717,7 @@ impl ModuleSection {
                     for _ in 0..locals_types {
                         let num_locals: usize = self.content.read_int()?; // number of locals of type `typ`
                         let typ = self.content.read_primitive_type()?;
-                        let value = Value::from(&typ);
-                        function.new_locals(num_locals, value);
+                        function.new_locals(num_locals, typ);
                     }
 
                     loop {

@@ -18,6 +18,7 @@ impl Instruction for Const {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         stack.push_value(self.value);
         Ok(ControlInfo::None)
@@ -64,6 +65,7 @@ impl Instruction for IBinOp {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let op_1 = stack.pop_value()?;
         let op_0 = stack.pop_value()?;
@@ -210,6 +212,7 @@ impl Instruction for FBinOp {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let op_1 = stack.pop_value()?;
         let op_0 = stack.pop_value()?;
@@ -326,6 +329,7 @@ impl Instruction for RelOp {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let op_1 = stack.pop_value()?;
         let op_0 = stack.pop_value()?;
@@ -447,6 +451,7 @@ impl Instruction for ITestOpEqz {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let op = stack.pop_value()?;
         if op.t != self.arg_type {
@@ -499,6 +504,7 @@ impl Instruction for IUnOp {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let op = stack.pop_value()?;
         if op.t != self.result_type {
@@ -568,6 +574,7 @@ impl Instruction for FUnOp {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let op = stack.pop_value()?;
         if op.t != self.result_type {
@@ -674,6 +681,7 @@ impl Instruction for CvtOp {
         stack: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let op = stack.pop_value()?;
         let has_correct_type = match self.op_type {
@@ -792,6 +800,7 @@ impl Instruction for LocalGet {
         stack: &mut Stack,
         _: &mut Memory,
         locals: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         stack.push_value(locals[self.index]);
         Ok(ControlInfo::None)
@@ -814,6 +823,7 @@ impl Instruction for LocalSet {
         stack: &mut Stack,
         _: &mut Memory,
         locals: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         locals[self.index] = stack.pop_value()?;
         Ok(ControlInfo::None)
@@ -836,6 +846,7 @@ impl Instruction for LocalTee {
         stack: &mut Stack,
         _: &mut Memory,
         locals: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         locals[self.index] = *stack.fetch_value(0)?;
         Ok(ControlInfo::None)
@@ -879,6 +890,7 @@ impl Instruction for Load {
         stack: &mut Stack,
         memory: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         let address = u32::try_from(stack.pop_value()?)? as u64 + self.offset as u64;
         match memory.read(self.result_type, self.load_bitwidth, address) {
@@ -908,6 +920,7 @@ impl Instruction for Store {
         stack: &mut Stack,
         memory: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         //TODO: popped values need to be checked
         let value = stack.pop_value()?.as_i64_unchecked() as u64;
@@ -919,7 +932,7 @@ impl Instruction for Store {
     }
 }
 
-struct Branch {
+pub struct Branch {
     branch_index: u32,
 }
 
@@ -935,7 +948,167 @@ impl Instruction for Branch {
         _: &mut Stack,
         _: &mut Memory,
         _: &mut Vec<Value>,
+        _: &Vec<Function>,
     ) -> Result<ControlInfo, Error> {
         Ok(ControlInfo::Branch(self.branch_index))
+    }
+}
+
+pub struct BranchIf {
+    branch_index: u32,
+}
+
+impl BranchIf {
+    pub fn new(branch_index: u32) -> Self {
+        Self { branch_index }
+    }
+}
+
+impl Instruction for BranchIf {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        _: &mut Memory,
+        _: &mut Vec<Value>,
+        _: &Vec<Function>,
+    ) -> Result<ControlInfo, Error> {
+        let condition = stack.pop_value()?.as_i64_unchecked() as u64;
+        if condition == 0 {
+            Ok(ControlInfo::None)
+        } else {
+            Ok(ControlInfo::Branch(self.branch_index))
+        }
+    }
+}
+
+pub struct Call {
+    function_index: usize,
+}
+
+impl Call {
+    pub fn new(function_index: usize) -> Self {
+        Self { function_index }
+    }
+}
+
+impl Instruction for Call {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        memory: &mut Memory,
+        _: &mut Vec<Value>,
+        functions: &Vec<Function>,
+    ) -> Result<ControlInfo, Error> {
+        log::debug!("Calling function with index {}", self.function_index);
+        let called_function = &functions[self.function_index];
+        let mut args = Vec::new();
+        for _ in 0..called_function.num_params() {
+            args.push(stack.pop_value()?);
+        }
+        args.reverse();
+        stack.push_value(called_function.call(functions, memory, args)?);
+        Ok(ControlInfo::None)
+    }
+}
+
+pub struct Return {}
+
+impl Return {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Instruction for Return {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        memory: &mut Memory,
+        _: &mut Vec<Value>,
+        functions: &Vec<Function>,
+    ) -> Result<ControlInfo, Error> {
+        Ok(ControlInfo::Return)
+    }
+}
+
+pub enum BlockContinuation {
+    Loop,
+    Branch,
+}
+
+pub struct Block {
+    continuation: BlockContinuation,
+    instructions: Vec<Box<dyn Instruction>>,
+}
+
+impl Block {
+    pub fn new(continuation: BlockContinuation, instructions: Vec<Box<dyn Instruction>>) -> Self {
+        Self {
+            continuation,
+            instructions,
+        }
+    }
+}
+
+impl Instruction for Block {
+    fn execute(
+        &self,
+        stack: &mut Stack,
+        memory: &mut Memory,
+        locals: &mut Vec<Value>,
+        functions: &Vec<Function>,
+    ) -> Result<ControlInfo, Error> {
+        // This outer loop is being used more as a goto than an actual loop.
+        let mut loop_restart;
+        loop {
+            loop_restart = false;
+            for inst in &self.instructions {
+                match inst.execute(stack, memory, locals, functions) {
+                    // Instruction returned a branch
+                    Ok(ControlInfo::Branch(branch_levels)) => {
+                        if branch_levels == 0 {
+                            // If we are a loop, continue execution from the beginning of our instrucitons.
+                            // Otherwise, halt execution and return to our parent block.
+                            match self.continuation {
+                                BlockContinuation::Loop => {
+                                    log::debug!("Branching to loop at depth 0");
+                                    loop_restart = true;
+                                }
+                                BlockContinuation::Branch => {
+                                    log::debug!("Branching out of a block with depth 0");
+                                    return Ok(ControlInfo::None);
+                                }
+                            }
+                        } else {
+                            // Both loops and branches need to pass the control information up to the higher block
+                            let new_depth = branch_levels - 1;
+                            log::debug!(
+                                "Branching out of block from branch depth {} to {}",
+                                branch_levels,
+                                new_depth
+                            );
+                            return Ok(ControlInfo::Branch(new_depth));
+                        }
+                    }
+                    Ok(ControlInfo::Return) => {
+                        // Unwrap up to the function's call handler
+                        log::debug!("Unwrapping return!");
+                        return Ok(ControlInfo::Return);
+                    }
+                    Ok(_) => (),
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+                if loop_restart {
+                    break;
+                }
+            }
+            // Getting here implies that we need to fall through the block
+            if !loop_restart {
+                break;
+            }
+        }
+        Ok(ControlInfo::None)
     }
 }
