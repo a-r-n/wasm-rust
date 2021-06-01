@@ -1,3 +1,4 @@
+use std::env;
 use wasm_interpreter::error::Error;
 use wasm_interpreter::parser::*;
 
@@ -7,38 +8,44 @@ fn handle_error<T>(x: Result<T, Error>) -> T {
             return n;
         }
         Err(Error::BadVersion) => {
-            println!("bad version")
+            println!("Bad version")
         }
         Err(Error::InvalidInput) => {
-            println!("invalid input")
+            println!("Invalid input")
         }
         Err(Error::UnknownOpcode(x)) => {
-            println!("unknown opcode: 0x{:X}", x)
+            println!("Unknown opcode: 0x{:X}", x)
         }
         Err(Error::EndOfData) => {
-            println!("end of data")
+            println!("End of data")
         }
         Err(Error::UnexpectedData(s)) => {
             println!("{}", s);
         }
         Err(Error::IntSizeViolation) => {
-            println!("int size violation")
+            println!("Int size violation")
         }
         Err(Error::StackViolation) => {
-            println!("stack violation")
+            println!("Stack violation")
         }
         Err(_) => {
-            println!("unknown error")
+            println!("Unknown error")
         }
     }
     std::process::exit(1);
 }
 
 fn main() {
+    println!("Enter main");
     env_logger::init();
-    println!("enter main");
-    let mut module = handle_error(parse_wasm("test_inputs/cmp_float.wasm"));
+    let args: Vec<String> = env::args().collect();
+
+    let filename = &args[1];
+
+    let mut module = handle_error(parse_wasm(filename));
+
     let ret_val = handle_error(module.call("main"));
+
     println!("Final value: {}", ret_val);
     // return module.call_external("main");
 }
